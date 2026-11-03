@@ -1,0 +1,19 @@
+[project]
+name = "overpass"
+version = "0.1.0"
+description = "Forensic verification of audio recording location from propeller-aircraft Doppler signatures and public ADS-B tracks"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "pandas", "matplotlib", "soundfile", "requests", "pillow", "torch"]
+
+[project.scripts]
+overpass = "overpass.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["overpass*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

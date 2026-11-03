@@ -1,0 +1,10 @@
+work/
+models/
+results/
+figures/
+logs/
+data/*.wav
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.venv/

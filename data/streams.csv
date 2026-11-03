@@ -1,0 +1,53 @@
+stream_id,url,lat,lon,region,place,split,truth_sigma_m
+us_jackson_hole,ytsearch:Jackson Hole Town Square live cam SeeJH,43.47989,-110.76231,US,"Jackson Hole Town Square, WY",calib,40
+us_venice_beach,ytsearch:Venice Beach live cam 24/7,33.98505,-118.47250,US,"Venice Beach boardwalk, CA",calib,80
+us_key_west,ytsearch:Key West live cam Southernmost Point,24.54650,-81.79760,US,"Southernmost Point, Key West FL",calib,80
+us_times_square,ytsearch:EarthCam Times Square live 4K,40.75800,-73.98550,US,"Times Square, New York NY",calib,100
+us_cornell_feeder,ytsearch:Cornell Lab FeederWatch cam live Sapsucker Woods,42.48010,-76.45120,US,"Cornell Lab of Ornithology, Ithaca NY",calib,80
+us_decorah_eagles,ytsearch:Decorah Eagles live cam Raptor Resource Project,43.29390,-91.80520,US,"Decorah fish hatchery, IA",calib,200
+us_nantucket,ytsearch:Nantucket live cam Brant Point harbor,41.29000,-70.09030,US,"Brant Point, Nantucket MA",calib,100
+us_chatham_pier,ytsearch:Chatham Fish Pier live cam Cape Cod,41.68000,-69.94700,US,"Chatham Fish Pier, MA",calib,100
+us_boothbay,ytsearch:Boothbay Harbor live cam Maine,43.85200,-69.62800,US,"Boothbay Harbor, ME",calib,150
+us_myrtle_beach,ytsearch:Myrtle Beach boardwalk live cam,33.69000,-78.88400,US,"Myrtle Beach boardwalk, SC",calib,100
+us_gatlinburg,ytsearch:Gatlinburg live cam downtown,35.71200,-83.51600,US,"Gatlinburg, TN",calib,100
+us_estes_park,ytsearch:Estes Park live cam Elkhorn Avenue,40.37700,-105.52100,US,"Estes Park, CO",calib,100
+us_hilton_head,ytsearch:Hilton Head Coligny Beach live cam,32.13700,-80.73300,US,"Coligny Beach, Hilton Head SC",calib,150
+us_ocean_city,ytsearch:Ocean City Maryland boardwalk live cam,38.33600,-75.08400,US,"Ocean City boardwalk, MD",calib,150
+us_seaside_or,ytsearch:Seaside Oregon live cam promenade,45.99300,-123.92900,US,"Seaside, OR",calib,150
+us_waikiki,ytsearch:Waikiki Beach live cam,21.27700,-157.82900,US,"Waikiki Beach, Honolulu HI",calib,150
+us_portland_head,ytsearch:Portland Head Light live cam,43.62300,-70.20800,US,"Portland Head Light, ME",calib,80
+us_provincetown,ytsearch:Provincetown live cam MacMillan Pier,42.05100,-70.18300,US,"MacMillan Pier, Provincetown MA",calib,100
+us_duluth_canal,ytsearch:Duluth Canal Park harbor cam live,46.77900,-92.09300,US,"Canal Park, Duluth MN",calib,100
+us_mackinac,ytsearch:Mackinac Island live cam,45.84900,-84.61900,US,"Mackinac Island, MI",calib,150
+us_bar_harbor,ytsearch:Bar Harbor Maine live cam,44.38800,-68.20400,US,"Bar Harbor, ME",calib,150
+us_cape_may,ytsearch:Cape May beach live cam,38.93100,-74.92400,US,"Cape May, NJ",calib,150
+us_clearwater,ytsearch:Clearwater Beach live cam,27.97700,-82.82700,US,"Clearwater Beach, FL",calib,150
+us_lake_tahoe,ytsearch:Lake Tahoe live cam south shore,38.95500,-119.94500,US,"South Lake Tahoe, CA",calib,200
+us_new_orleans,ytsearch:New Orleans Bourbon Street live cam EarthCam,29.95870,-90.06550,US,"Bourbon Street, New Orleans LA",calib,100
+us_asheville,ytsearch:Asheville live cam downtown,35.59500,-82.55100,US,"Asheville, NC",calib,200
+us_sedona,ytsearch:Sedona live cam uptown,34.87000,-111.76100,US,"Sedona, AZ",calib,200
+us_st_augustine,ytsearch:St Augustine live cam bridge of lions,29.89300,-81.31000,US,"St Augustine, FL",calib,150
+us_galveston,ytsearch:Galveston seawall live cam,29.28300,-94.78800,US,"Galveston, TX",calib,150
+us_lake_placid,ytsearch:Lake Placid live cam Main Street,44.28000,-73.98200,US,"Lake Placid, NY",calib,150
+eu_rialto,ytsearch:Rialto Bridge Venice live cam SkylineWebcams,45.43800,12.33590,EU,"Rialto Bridge, Venice IT",test,60
+eu_trevi,ytsearch:Trevi Fountain Rome live cam SkylineWebcams,41.90090,12.48330,EU,"Trevi Fountain, Rome IT",test,40
+eu_san_marco,ytsearch:Piazza San Marco Venice live cam,45.43410,12.33880,EU,"Piazza San Marco, Venice IT",test,80
+eu_thessaloniki,ytsearch:Thessaloniki Aristotelous Square live cam,40.63250,22.94070,EU,"Aristotelous Square, Thessaloniki GR",test,80
+eu_piran,ytsearch:Piran Tartini Square live cam,45.52830,13.56820,EU,"Tartini Square, Piran SI",test,60
+eu_naples,ytsearch:Naples Piazza Garibaldi live cam SkylineWebcams,40.85250,14.26980,EU,"Piazza Garibaldi, Naples IT",test,100
+eu_prague,ytsearch:Prague Old Town Square live cam,50.08750,14.42130,EU,"Old Town Square, Prague CZ",test,80
+eu_dublin,ytsearch:Dublin Temple Bar live cam EarthCam,53.34560,-6.26340,EU,"Temple Bar, Dublin IE",test,80
+eu_madrid,ytsearch:Puerta del Sol Madrid live cam,40.41690,-3.70350,EU,"Puerta del Sol, Madrid ES",test,80
+eu_amsterdam,ytsearch:Amsterdam Dam Square live cam,52.37310,4.89320,EU,"Dam Square, Amsterdam NL",test,80
+eu_scheveningen,ytsearch:Scheveningen beach live cam,52.11100,4.27900,EU,"Scheveningen Pier, NL",test,150
+eu_ljubljana,ytsearch:Ljubljana Preseren Square live cam,46.05140,14.50600,EU,"Preseren Square, Ljubljana SI",test,60
+eu_lisbon,ytsearch:Lisbon Praca do Comercio live cam,38.70750,-9.13640,EU,"Praca do Comercio, Lisbon PT",test,100
+eu_krakow,ytsearch:Krakow Main Market Square live cam,50.06170,19.93730,EU,"Main Market Square, Krakow PL",test,100
+eu_nyhavn,ytsearch:Copenhagen Nyhavn live cam,55.67970,12.59060,EU,"Nyhavn, Copenhagen DK",test,100
+eu_bruges,ytsearch:Bruges Markt live cam,51.20890,3.22460,EU,"Markt, Bruges BE",test,80
+eu_hamburg,ytsearch:Hamburg Landungsbruecken live cam,53.54600,9.97100,EU,"Landungsbruecken, Hamburg DE",test,150
+eu_palma,ytsearch:Palma de Mallorca live cam cathedral,39.56750,2.65000,EU,"Palma Cathedral, Mallorca ES",test,150
+eu_nerja,ytsearch:Nerja Balcon de Europa live cam,36.74370,-3.87400,EU,"Balcon de Europa, Nerja ES",test,60
+eu_innsbruck,ytsearch:Innsbruck live cam Goldenes Dachl,47.26850,11.39330,EU,"Goldenes Dachl, Innsbruck AT",test,80
+eu_santorini,ytsearch:Santorini Oia live cam,36.46180,25.37530,EU,"Oia, Santorini GR",test,200
+eu_zakopane,ytsearch:Zakopane Krupowki live cam,49.29300,19.96200,EU,"Krupowki, Zakopane PL",test,150
