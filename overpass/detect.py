@@ -218,7 +218,8 @@ def group_harmonics(comps, tol: float = 0.12):
 
 
 def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, refine: bool = True,
-           top: int | None = None, min_len_s: float = 40.0, min_area: int = 60, log=None) -> list[Detection]:
+           top: int | None = None, min_len_s: float = 40.0, min_area: int = 60, log=None,
+           min_f0: float = 55.0, min_span: float = 0.10, min_fit_score: float = 1.0) -> list[Detection]:
     """Full detector: ridge map -> components -> harmonic groups -> EventFit per group."""
     c = speed_of_sound() if c is None else c
     P = predict_map(model, sp)
@@ -227,16 +228,28 @@ def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, ref
     for (a, harm, members) in group_harmonics(comps):
         t0, t1, flo, fhi, prob, area = a
         area = sum(m[5] for m in members)
+        fc = 0.5 * (flo + fhi)
+        # a propeller fundamental lies above ~55 Hz and a flyover sweeps by at least 2v/c (>= 10 %);
+        # flat ridges (machinery, hum residue) and sub-55 Hz rumble are not flyovers
+        if fc < min_f0 or (fhi - flo) / fc < min_span:
+            continue
         d = Detection(t0, t1, flo, fhi, harm, prob, area)
         if refine:
             try:
-                d.fit = fit_event(sp, max(t0 - 20, sp.t[0]), min(t1 + 20, sp.t[-1]),
-                                  max(flo * 0.9, sp.f[0] + 1), min(fhi * 1.1, sp.f[-1] - 1), c=c, harmonics=harm,
+                # the fit's fundamental grid spans (f_lo*1.15, f_hi*0.85): guarantee a band ratio >= 1.6
+                fc = 0.5 * (flo + fhi)
+                band_lo = max(min(flo * 0.9, fc / 1.3), sp.f[0] + 1)
+                band_hi = min(max(fhi * 1.1, fc * 1.3), sp.f[-1] - 1)
+                d.fit = fit_event(sp, max(t0 - 20, sp.t[0]), min(t1 + 20, sp.t[-1]), band_lo, band_hi, c=c, harmonics=harm,
                                   v_bounds=(25.0, 220.0), d_bounds=(150.0, 20000.0))
             except Exception as e:      # a degenerate component; keep the detection without a fit
                 if log: log(f"fit failed for {t0:.0f}-{t1:.0f}s: {e}")
+        if refine and d.fit is not None and d.fit.score < min_fit_score:
+            continue
         dets.append(d)
-    dets.sort(key=lambda d: -(d.prob * np.sqrt(d.area)))
+    # rank by the contrast of the fitted ideal curve (a real flyover is bright *and* Doppler-shaped);
+    # unfitted detections fall back to the ridge probability
+    dets.sort(key=lambda d: -(d.fit.score if d.fit is not None else d.prob))
     return dets[:top] if top else dets
 
 

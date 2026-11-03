@@ -1,0 +1,53 @@
+stream_id,place,yt_id,title,keyword_match
+us_jackson_hole,"Jackson Hole Town Square, WY",,,False
+us_venice_beach,"Venice Beach boardwalk, CA",,,False
+us_key_west,"Southernmost Point, Key West FL",,,False
+us_times_square,"Times Square, New York NY",,,False
+us_cornell_feeder,"Cornell Lab of Ornithology, Ithaca NY",,,False
+us_decorah_eagles,"Decorah fish hatchery, IA",,,False
+us_nantucket,"Brant Point, Nantucket MA",,,False
+us_chatham_pier,"Chatham Fish Pier, MA",,,False
+us_boothbay,"Boothbay Harbor, ME",,,False
+us_myrtle_beach,"Myrtle Beach boardwalk, SC",,,False
+us_gatlinburg,"Gatlinburg, TN",,,False
+us_estes_park,"Estes Park, CO",,,False
+us_hilton_head,"Coligny Beach, Hilton Head SC",,,False
+us_ocean_city,"Ocean City boardwalk, MD",,,False
+us_seaside_or,"Seaside, OR",,,False
+us_waikiki,"Waikiki Beach, Honolulu HI",,,False
+us_portland_head,"Portland Head Light, ME",,,False
+us_provincetown,"MacMillan Pier, Provincetown MA",,,False
+us_duluth_canal,"Canal Park, Duluth MN",,,False
+us_mackinac,"Mackinac Island, MI",,,False
+us_bar_harbor,"Bar Harbor, ME",,,False
+us_cape_may,"Cape May, NJ",,,False
+us_clearwater,"Clearwater Beach, FL",,,False
+us_lake_tahoe,"South Lake Tahoe, CA",,,False
+us_new_orleans,"Bourbon Street, New Orleans LA",,,False
+us_asheville,"Asheville, NC",,,False
+us_sedona,"Sedona, AZ",,,False
+us_st_augustine,"St Augustine, FL",,,False
+us_galveston,"Galveston, TX",,,False
+us_lake_placid,"Lake Placid, NY",,,False
+eu_rialto,"Rialto Bridge, Venice IT",,,False
+eu_trevi,"Trevi Fountain, Rome IT",,,False
+eu_san_marco,"Piazza San Marco, Venice IT",,,False
+eu_thessaloniki,"Aristotelous Square, Thessaloniki GR",,,False
+eu_piran,"Tartini Square, Piran SI",,,False
+eu_naples,"Piazza Garibaldi, Naples IT",,,False
+eu_prague,"Old Town Square, Prague CZ",,,False
+eu_dublin,"Temple Bar, Dublin IE",,,False
+eu_madrid,"Puerta del Sol, Madrid ES",,,False
+eu_amsterdam,"Dam Square, Amsterdam NL",,,False
+eu_scheveningen,"Scheveningen Pier, NL",,,False
+eu_ljubljana,"Preseren Square, Ljubljana SI",,,False
+eu_lisbon,"Praca do Comercio, Lisbon PT",,,False
+eu_krakow,"Main Market Square, Krakow PL",,,False
+eu_nyhavn,"Nyhavn, Copenhagen DK",,,False
+eu_bruges,"Markt, Bruges BE",,,False
+eu_hamburg,"Landungsbruecken, Hamburg DE",,,False
+eu_palma,"Palma Cathedral, Mallorca ES",,,False
+eu_nerja,"Balcon de Europa, Nerja ES",,,False
+eu_innsbruck,"Goldenes Dachl, Innsbruck AT",,,False
+eu_santorini,"Oia, Santorini GR",,,False
+eu_zakopane,"Krupowki, Zakopane PL",,,False
