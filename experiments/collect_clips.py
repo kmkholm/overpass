@@ -28,30 +28,41 @@ def resolve(url: str) -> dict | None:
     cams change when the operator restarts them, so a search is more durable than a video ID)."""
     target = f"ytsearch10:{url[9:]}" if url.startswith("ytsearch:") else url
     try:
+        # audio-only formats only (YouTube live offers audio-only HLS); live HLS reports acodec=None, so only
+        # an explicit "none" is rejected and ffmpeg's result decides
         out = subprocess.run([sys.executable, "-m", "yt_dlp", "-j", "--no-playlist", "--ignore-errors",
-                              "-f", "bestaudio/best", target], capture_output=True, text=True, timeout=240)
+                              "-f", "bestaudio", target], capture_output=True, text=True, timeout=240)
         for line in out.stdout.splitlines():
             try:
                 j = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if j.get("is_live") and j.get("url") and j.get("acodec") not in (None, "none"):
+            if j.get("is_live") and j.get("url") and j.get("acodec") != "none" and j.get("vcodec") in (None, "none"):
                 return {"media": j["url"], "acodec": j.get("acodec"), "title": j.get("title"), "id": j.get("id")}
         return None
     except Exception:
         return None
 
 
-def record(stream_id: str, media_url: str, seconds: int, out_wav: Path) -> tuple[bool, str]:
+def record(stream_id: str, media_url: str, seconds: int, out_path: Path) -> tuple[bool, str]:
+    """Mono 16 kHz FLAC (about half the size of WAV; dopplertrack decodes it with ffmpeg)."""
     t0 = datetime.now(timezone.utc)
     cmd = ["ffmpeg", "-v", "error", "-y", "-i", media_url, "-t", str(seconds), "-vn", "-ac", "1", "-ar", "16000",
-           "-acodec", "pcm_s16le", str(out_wav)]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=seconds + 300)
-    ok = r.returncode == 0 and out_wav.exists() and out_wav.stat().st_size > 16000 * 2 * seconds * 0.8
-    return ok, t0.isoformat(timespec="seconds").replace("+00:00", "+00:00")
+           "-acodec", "flac", str(out_path)]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=seconds + 300)
+    ok = out_path.exists() and out_path.stat().st_size > 16000 * 2 * seconds * 0.25
+    return ok, t0.isoformat(timespec="seconds")
+
+
+def _ascii(s: str) -> str:
+    return "".join(ch if ord(ch) < 128 else "?" for ch in (s or ""))
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--streams", default="data/streams.csv"); ap.add_argument("--out", default="data")
     ap.add_argument("--minutes", type=int, default=30); ap.add_argument("--parallel", type=int, default=8)
@@ -62,27 +73,27 @@ def main():
     print(f"{len(streams)} streams; resolving ...")
     with ThreadPoolExecutor(a.parallel) as ex:
         resolved = list(ex.map(lambda s: resolve(s["url"]), streams))
-    live = [(s, r) for s, r in zip(streams, resolved) if r and r["media"] and r["acodec"] not in (None, "none")]
-    print(f"{len(live)} live streams with audio")
+    live = [(s, r) for s, r in zip(streams, resolved) if r]
+    print(f"{len(live)} live streams with an audio-only format", flush=True)
     for s, r in zip(streams, resolved):
-        if not (r and r["media"] and r["acodec"] not in (None, "none")):
-            print(f"  skip {s['stream_id']}: offline or no audio")
+        if not r:
+            print(f"  skip {s['stream_id']}: offline or no audio-only format", flush=True)
     secs = a.minutes * 60
 
     def job(item):
         s, r = item
-        wav = out / f"{s['stream_id']}.wav"
-        ok, t0 = record(s["stream_id"], r["media"], secs, wav)
-        return s, ok, t0
+        ok, t0 = record(s["stream_id"], r["media"], secs, out / f"{s['stream_id']}.flac")
+        return s, r, ok, t0
 
     rows = []
     with ThreadPoolExecutor(a.parallel) as ex:
-        for s, ok, t0 in ex.map(job, live):
-            print(f"  {s['stream_id']}: {'ok' if ok else 'FAILED'} start {t0}")
+        for s, r, ok, t0 in ex.map(job, live):
+            title = _ascii(r.get("title", ""))
+            print(f"  {s['stream_id']}: {'ok' if ok else 'FAILED'} start {t0} ({title[:50]})", flush=True)
             if ok:
-                rows.append({"clip_id": s["stream_id"], "path": str(out / f"{s['stream_id']}.wav"), "lat": s["lat"], "lon": s["lon"],
+                rows.append({"clip_id": s["stream_id"], "path": f"data/{s['stream_id']}.flac", "lat": s["lat"], "lon": s["lon"],
                              "utc_start": t0, "date": t0[:10], "region": s["region"], "split": s["split"], "source": "webcam",
-                             "notes": f"{s.get('place', '')}; {s['url']}"})
+                             "notes": f"{s.get('place', '')}; sigma {s.get('truth_sigma_m', '')} m; yt {r.get('id', '')}; {title[:60]}"})
     man = Path(a.manifest)
     existing = list(csv.DictReader(open(man, newline="", encoding="utf-8"))) if man.exists() else []
     keep = [r for r in existing if r["clip_id"] not in {x["clip_id"] for x in rows}]

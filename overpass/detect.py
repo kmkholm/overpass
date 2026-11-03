@@ -113,25 +113,54 @@ def load_model(path, device: str | None = None):
     return m
 
 
-def predict_map(model, sp: Spectrogram, chunk_frames: int = 2048, overlap: int = 64, device: str | None = None) -> np.ndarray:
-    """Ridge probability (F, T) for a whole spectrogram, in overlapping time chunks."""
+def export_onnx(model, path, device: str | None = None):
+    """Export the trained segmenter to ONNX (dynamic F and T) for the torch-free desktop app."""
     torch, _ = _torch()
     device = device or next(model.parameters()).device
+    model.eval()
+    dummy = torch.zeros(1, 1, 256, 480, device=device)
+    torch.onnx.export(model, dummy, str(path), input_names=["x"], output_names=["logit"], opset_version=17,
+                      dynamic_axes={"x": {2: "F", 3: "T"}, "logit": {2: "F", 3: "T"}})
+    return path
+
+
+class OnnxRidge:
+    """Thin wrapper so predict_map can take either a torch model or an ONNX session."""
+
+    def __init__(self, path):
+        import onnxruntime as ort
+        self.sess = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        logit = self.sess.run(["logit"], {"x": x.astype(np.float32)})[0]
+        return 1.0 / (1.0 + np.exp(-logit))
+
+
+def predict_map(model, sp: Spectrogram, chunk_frames: int = 2048, overlap: int = 64, device: str | None = None) -> np.ndarray:
+    """Ridge probability (F, T) for a whole spectrogram, in overlapping time chunks.
+    `model` is a torch RidgeNet or an OnnxRidge."""
     F, T = sp.S.shape
     P = np.zeros((F, T), np.float32); Wt = np.zeros(T, np.float32)
-    model.eval()
-    with torch.no_grad():
-        for a in range(0, T, chunk_frames - overlap):
-            b = min(a + chunk_frames, T)
-            x, (f0, t0) = _pad8(sp.S[:, a:b])
-            logit = model(torch.from_numpy(x[None, None]).to(device))
-            p = torch.sigmoid(logit)[0, 0, :f0, :t0].cpu().numpy()
-            w = np.ones(t0, np.float32)
-            if a > 0: w[:overlap] = np.linspace(0, 1, overlap)
-            if b < T: w[-overlap:] = np.minimum(w[-overlap:], np.linspace(1, 0, overlap))
-            P[:, a:b] += p * w[None, :]; Wt[a:b] += w
-            if b == T:
-                break
+    if isinstance(model, OnnxRidge):
+        run = lambda x: model(x[None, None])[0, 0]
+    else:
+        torch, _ = _torch()
+        device = device or next(model.parameters()).device
+        model.eval()
+
+        def run(x):
+            with torch.no_grad():
+                return torch.sigmoid(model(torch.from_numpy(x[None, None]).to(device)))[0, 0].cpu().numpy()
+    for a in range(0, T, chunk_frames - overlap):
+        b = min(a + chunk_frames, T)
+        x, (f0, t0) = _pad8(sp.S[:, a:b])
+        p = run(x)[:f0, :t0]
+        w = np.ones(t0, np.float32)
+        if a > 0: w[:overlap] = np.linspace(0, 1, overlap)
+        if b < T: w[-overlap:] = np.minimum(w[-overlap:], np.linspace(1, 0, overlap))
+        P[:, a:b] += p * w[None, :]; Wt[a:b] += w
+        if b == T:
+            break
     return P / np.maximum(Wt, 1e-6)[None, :]
 
 

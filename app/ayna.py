@@ -1,0 +1,372 @@
+# -*- coding: utf-8 -*-
+"""Ayna (أين سُجِّل؟) — desktop app: where was this recording made?
+
+Bilingual (Arabic / English) PyQt5 front end over the overpass pipeline. One-file EXE via
+Build_EXE.cmd. No torch: the learned detector runs through ONNX Runtime if models/ridgenet.onnx
+is present, otherwise the classical scan detector is used.
+
+Tabs:  Verify / Search   (file + date + claimed point or region -> ranked map + report)
+       Clean my recording (detect the Doppler comb and remove it before publishing)
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import threading
+import traceback
+from datetime import datetime, timezone
+from pathlib import Path
+
+os.environ.setdefault("QT_API", "pyqt5")
+BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+if (BASE / "bin").exists():
+    os.environ["PATH"] = str(BASE / "bin") + os.pathsep + os.environ.get("PATH", "")
+CACHE = Path(os.environ.get("AYNA_HOME", Path.home() / "Ayna"))
+CACHE.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("DOPPLERTRACK_CACHE", str(CACHE / "cache"))
+
+import numpy as np
+from PyQt5 import QtCore, QtGui, QtWidgets as W
+
+APP_VERSION = "0.1.0"
+DEVELOPER = "Dr. Mohammed Tawfik — kmkhol01@gmail.com"
+SETTINGS = CACHE / "settings.json"
+
+
+def _lang() -> str:
+    try:
+        return json.load(open(SETTINGS)).get("lang", "ar")
+    except Exception:
+        return "ar"
+
+
+LANG = _lang()
+
+
+def L(ar: str, en: str) -> str:
+    return ar if LANG == "ar" else en
+
+
+# ----------------------------------------------------------------------------- pipeline worker
+class Worker(QtCore.QObject):
+    progress = QtCore.pyqtSignal(int, str)
+    done = QtCore.pyqtSignal(dict)
+    failed = QtCore.pyqtSignal(str)
+
+    def __init__(self, job: dict):
+        super().__init__(); self.job = job
+
+    def run(self):
+        try:
+            self.done.emit(self._run())
+        except Exception:
+            self.failed.emit(traceback.format_exc())
+
+    # -- shared steps
+    def _spectrogram(self, path: str):
+        from dopplertrack import pipeline
+        from dopplertrack.audio import Spectrogram
+        key = Path(path).stem + f"_{Path(path).stat().st_size}"
+        sp_path = CACHE / "work" / f"{key}.spec.npz"; sp_path.parent.mkdir(parents=True, exist_ok=True)
+        if not sp_path.exists():
+            self.progress.emit(5, L("استخراج الصوت وحساب المطياف…", "Decoding audio and computing the spectrogram…"))
+            pipeline.make_spectrogram(path, sp_path)
+        return Spectrogram.load(sp_path), key
+
+    def _events(self, sp, key: str, top: int):
+        from overpass import detect as D
+        det_path = CACHE / "work" / f"{key}.det.json"
+        if det_path.exists():
+            dets = D.load_detections(det_path)
+        else:
+            onnx = BASE / "models" / "ridgenet.onnx"
+            if onnx.exists():
+                self.progress.emit(15, L("كشف الطائرات العابرة (الكاشف المتعلَّم)…", "Detecting flyovers (learned detector)…"))
+                dets = D.detect(D.OnnxRidge(onnx), sp, top=top)
+            else:
+                self.progress.emit(15, L("كشف الطائرات العابرة (المسح الكلاسيكي، أبطأ)…", "Detecting flyovers (classical scan, slower)…"))
+                from dopplertrack.tracks import detect_events
+                evs = detect_events(sp, 60, 260, top=top, workers=4)
+                dets = [D.Detection(e.t_start, e.t_end, e.f_post, e.f_pre, 1, float(e.score) / 20.0, 0, e) for e in evs]
+            D.save_detections(dets, det_path)
+        return [d.fit for d in dets if d.fit is not None]
+
+    def _traces(self, date: str, lat: float, lon: float):
+        from dopplertrack import pipeline
+        from dopplertrack.adsb import load_traces
+        from overpass.benchmark import bbox_around
+        tr_path = CACHE / "work" / f"adsb_{date}_{lat:.2f}_{lon:.2f}.npz"
+        if not tr_path.exists():
+            self.progress.emit(30, L("جلب مسارات الطيران لذلك اليوم من adsb.lol (قد يستغرق 10–20 دقيقة)…",
+                                     "Fetching that day's flight tracks from adsb.lol (10–20 min)…"))
+            pipeline.fetch_region(date, bbox_around(lat, lon, 160.0), tr_path)
+        return load_traces(tr_path)
+
+    def _run(self) -> dict:
+        j = self.job
+        if j["kind"] == "scrub":
+            return self._scrub()
+        from dopplertrack.terrain import Terrain
+        from overpass import nsearch as NS
+        sp, key = self._spectrogram(j["path"])
+        events = self._events(sp, key, top=8)
+        if len(events) < 2:
+            raise RuntimeError(L("وُجد أقل من حدثين لطائرات في التسجيل؛ لا يمكن تحديد الموقع.",
+                                 "Fewer than two aircraft events were found in the recording; the location cannot be fixed."))
+        events = sorted(events[:j.get("n_events", 3)], key=lambda e: e.t_cpa)
+        lat0, lon0 = j["center"]
+        traces = self._traces(j["date"], lat0, lon0)
+        elev = Terrain().elevation
+        self.progress.emit(55, L("البحث عن المواقع المرشّحة…", "Searching candidate locations…"))
+        if j["kind"] == "verify":
+            res, segs = NS.verify(sp, events, traces, lat0, lon0, elevation=elev, half_m=j.get("half_m", 1500.0),
+                                  spacing_m=100.0, harmonics=[1] * len(events), progress=False)
+        else:
+            res, segs = NS.search(sp, events, traces, j["bbox"], elevation=elev, spacing_m=j.get("spacing", 200.0),
+                                  harmonics=[1] * len(events), progress=False, cpa_cache=str(CACHE / "work" / f"{key}_cpa.npz"))
+        if len(res) == 0:
+            raise RuntimeError(L("لا يوجد مرشّح يطابق تسلسل الطائرات المسموعة في هذه المنطقة.",
+                                 "No candidate in this region matches the sequence of audible aircraft."))
+        best = NS.best_per_point(res)
+        self.progress.emit(90, L("إعداد الخريطة والتقرير…", "Preparing the map and the report…"))
+        out_dir = CACHE / "reports"; out_dir.mkdir(exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_path = out_dir / f"ayna_{stamp}.csv"; best.to_csv(csv_path, index=False)
+        png = out_dir / f"ayna_{stamp}.png"; pdf = out_dir / f"ayna_{stamp}.pdf"
+        self._figure(best, j, png, pdf, events, sp)
+        top = best.iloc[0]
+        q = j.get("q90", 1.0)
+        from overpass.conformal import gap_set
+        cells, area = gap_set(best, q, j.get("spacing", 200.0) if j["kind"] == "search" else 100.0)
+        return {"lat": float(top.lat), "lon": float(top.lon), "score": float(top.score), "n_events": len(events),
+                "n_points": int(len(best)), "area_km2": float(area), "png": str(png), "pdf": str(pdf), "csv": str(csv_path),
+                "events": [(float(e.t_cpa), float(e.f0)) for e in events],
+                "claimed_rank": self._claimed_rank(best, j) if j["kind"] == "verify" else None}
+
+    @staticmethod
+    def _claimed_rank(best, j):
+        from dopplertrack.geo import haversine_m
+        d = haversine_m(best.lat.to_numpy(), best.lon.to_numpy(), j["center"][0], j["center"][1])
+        m = d <= 75.0
+        if not m.any():
+            return None
+        s = float(best.score[m].max())
+        return int((best.score > s).sum() + 1)
+
+    def _figure(self, best, j, png, pdf, events, sp):
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+        fig, ax = plt.subplots(figsize=(7, 6))
+        sc = ax.scatter(best.lon, best.lat, c=best.score, s=4 if len(best) > 2000 else 14, cmap="cividis")
+        plt.colorbar(sc, ax=ax, label="score (z)")
+        top = best.iloc[0]
+        ax.plot(top.lon, top.lat, "+", color="#E63946", ms=14, mew=2, label="best point")
+        if j["kind"] == "verify":
+            ax.plot(j["center"][1], j["center"][0], "x", color="#00B4D8", ms=12, mew=2, label="claimed point")
+        ax.set_xlabel("longitude"); ax.set_ylabel("latitude"); ax.set_aspect(1 / np.cos(np.radians(top.lat))); ax.legend(frameon=False)
+        ax.set_title(f"Ayna — best {top.lat:.5f}, {top.lon:.5f}  (score {top.score:.2f}, {len(events)} events)")
+        fig.tight_layout(); fig.savefig(png, dpi=150)
+        with PdfPages(pdf) as pp:
+            pp.savefig(fig)
+            fig2, axes = plt.subplots(len(events), 1, figsize=(7, 2.4 * len(events)), squeeze=False)
+            from dopplertrack.tracks import local_whiten
+            for a_, e in zip(axes[:, 0], events):
+                w = local_whiten(sp.crop(e.t_start - 30, e.t_end + 30, max(e.f_post * 0.7, sp.f[0]), min(e.f_pre * 1.3 * 2, sp.f[-1])))
+                a_.imshow(w.S, origin="lower", aspect="auto", extent=[w.t[0], w.t[-1], w.f[0], w.f[-1]], vmin=0, vmax=10, cmap="magma")
+                a_.set_title(f"event at {e.t_cpa:.0f} s, f0 {e.f0:.0f} Hz, v {e.v:.0f} m/s, d {e.d:.0f} m", fontsize=9)
+            fig2.text(0.01, 0.005, f"Ayna {APP_VERSION} — {DEVELOPER} — file {Path(j['path']).name} — date {j['date']}", fontsize=7)
+            fig2.tight_layout(); pp.savefig(fig2); plt.close(fig2)
+        plt.close(fig)
+
+    def _scrub(self) -> dict:
+        import soundfile as sf
+        from dopplertrack.audio import load_audio
+        from overpass import scrub as SC
+        j = self.job
+        sp, key = self._spectrogram(j["path"])
+        events = self._events(sp, key, top=6)
+        self.progress.emit(50, L("إزالة بصمة الطائرات من الصوت…", "Removing the aircraft comb from the audio…"))
+        x, sr = load_audio(j["path"], sr=16000)
+        tracks = [SC.track_from_event(sp, e, harmonics=3) for e in events]
+        y = SC.scrub(x, sr, tracks, mode="fill") if tracks else x
+        out = str(Path(j["path"]).with_name(Path(j["path"]).stem + "_clean.wav"))
+        sf.write(out, y, sr)
+        before_after = [SC.residual_contrast(x, y, sr, e) for e in events]
+        return {"out": out, "n_events": len(events), "before_after": before_after,
+                "events": [(float(e.t_cpa), float(e.f0)) for e in events]}
+
+
+# ----------------------------------------------------------------------------- UI
+class Main(W.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(L("أين سُجِّل؟ — Ayna", "Ayna — Where was this recorded?"))
+        self.resize(980, 720)
+        if LANG == "ar":
+            self.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.setFont(QtGui.QFont("Segoe UI", 10))
+        tabs = W.QTabWidget(); self.setCentralWidget(tabs)
+        tabs.addTab(self._tab_locate(), L("تحقق / بحث", "Verify / Search"))
+        tabs.addTab(self._tab_scrub(), L("نظّف تسجيلي", "Clean my recording"))
+        tabs.addTab(self._tab_about(), L("حول", "About"))
+        self.statusBar().showMessage(f"Ayna {APP_VERSION} — {DEVELOPER}")
+        self.thread = None
+
+    # -- helpers
+    def _file_row(self, label, attr):
+        row = W.QHBoxLayout(); edit = W.QLineEdit(); btn = W.QPushButton(L("اختر ملفاً…", "Browse…"))
+        def pick():
+            p, _ = W.QFileDialog.getOpenFileName(self, label, "", "Audio/Video (*.mp4 *.mkv *.mov *.m4a *.mp3 *.wav *.flac *.ogg *.webm);;All (*)")
+            if p: edit.setText(p)
+        btn.clicked.connect(pick); row.addWidget(W.QLabel(label)); row.addWidget(edit, 1); row.addWidget(btn)
+        setattr(self, attr, edit); return row
+
+    def _tab_locate(self):
+        w = W.QWidget(); v = W.QVBoxLayout(w)
+        intro = W.QLabel(L("ارفع تسجيلاً صوتياً أو فيديو، حدّد تاريخ التسجيل (UTC)، ثم إمّا نقطة مُدَّعاة للتحقق منها أو منطقة بحث (حتى 150 كم). "
+                           "يحتاج البرنامج إلى الإنترنت لجلب مسارات الطيران وبيانات الارتفاع.",
+                           "Load an audio or video file, set the recording date (UTC), then either a claimed point to verify or a search region (up to 150 km). "
+                           "Internet access is needed for the flight tracks and the elevation data."))
+        intro.setWordWrap(True); v.addWidget(intro)
+        v.addLayout(self._file_row(L("الملف:", "File:"), "loc_file"))
+        g = W.QGridLayout(); v.addLayout(g)
+        self.date = W.QDateEdit(QtCore.QDate.currentDate().addDays(-2)); self.date.setCalendarPopup(True); self.date.setDisplayFormat("yyyy-MM-dd")
+        g.addWidget(W.QLabel(L("تاريخ التسجيل (UTC):", "Recording date (UTC):")), 0, 0); g.addWidget(self.date, 0, 1)
+        self.mode = W.QComboBox(); self.mode.addItems([L("تحقق من نقطة مُدَّعاة", "Verify a claimed point"), L("بحث في منطقة", "Search a region")])
+        g.addWidget(W.QLabel(L("الوضع:", "Mode:")), 0, 2); g.addWidget(self.mode, 0, 3)
+        self.lat = W.QLineEdit("40.876466"); self.lon = W.QLineEdit("-73.524951")
+        g.addWidget(W.QLabel(L("خط العرض:", "Latitude:")), 1, 0); g.addWidget(self.lat, 1, 1)
+        g.addWidget(W.QLabel(L("خط الطول:", "Longitude:")), 1, 2); g.addWidget(self.lon, 1, 3)
+        self.side = W.QSpinBox(); self.side.setRange(10, 150); self.side.setValue(100); self.side.setSuffix(" km")
+        g.addWidget(W.QLabel(L("ضلع منطقة البحث حول النقطة:", "Search box side around the point:")), 2, 0); g.addWidget(self.side, 2, 1)
+        self.nev = W.QSpinBox(); self.nev.setRange(2, 5); self.nev.setValue(3)
+        g.addWidget(W.QLabel(L("عدد الطائرات المستخدمة:", "Aircraft events used:")), 2, 2); g.addWidget(self.nev, 2, 3)
+        self.run_btn = W.QPushButton(L("ابدأ", "Start")); self.run_btn.setMinimumHeight(36); self.run_btn.clicked.connect(self.start_locate)
+        v.addWidget(self.run_btn)
+        self.bar = W.QProgressBar(); self.bar.setRange(0, 100); v.addWidget(self.bar)
+        self.status = W.QLabel(""); self.status.setWordWrap(True); v.addWidget(self.status)
+        self.result = W.QTextEdit(); self.result.setReadOnly(True); self.result.setMaximumHeight(150); v.addWidget(self.result)
+        self.img = W.QLabel(); self.img.setAlignment(QtCore.Qt.AlignCenter); self.img.setMinimumHeight(260); v.addWidget(self.img, 1)
+        row = W.QHBoxLayout()
+        self.open_pdf = W.QPushButton(L("افتح التقرير PDF", "Open PDF report")); self.open_pdf.setEnabled(False); self.open_pdf.clicked.connect(lambda: self._open(self._pdf))
+        self.open_map = W.QPushButton(L("افتح أفضل نقطة في خرائط Google", "Open best point in Google Maps")); self.open_map.setEnabled(False); self.open_map.clicked.connect(self._gmaps)
+        row.addWidget(self.open_pdf); row.addWidget(self.open_map); v.addLayout(row)
+        return w
+
+    def _tab_scrub(self):
+        w = W.QWidget(); v = W.QVBoxLayout(w)
+        intro = W.QLabel(L("يفحص التسجيل بحثاً عن نغمات مراوح الطائرات غير المسموعة التي تكشف موقعك، ويُخرج نسخة منظّفة (WAV) تحتفظ بالكلام. "
+                           "لا يحتاج إلى الإنترنت.", "Checks the recording for the inaudible propeller tones that leak your position and writes a cleaned copy (WAV) that keeps the speech. No internet needed."))
+        intro.setWordWrap(True); v.addWidget(intro)
+        v.addLayout(self._file_row(L("الملف:", "File:"), "scrub_file"))
+        self.scrub_btn = W.QPushButton(L("افحص ونظّف", "Check and clean")); self.scrub_btn.setMinimumHeight(36); self.scrub_btn.clicked.connect(self.start_scrub); v.addWidget(self.scrub_btn)
+        self.bar2 = W.QProgressBar(); self.bar2.setRange(0, 100); v.addWidget(self.bar2)
+        self.status2 = W.QLabel(""); self.status2.setWordWrap(True); v.addWidget(self.status2)
+        self.result2 = W.QTextEdit(); self.result2.setReadOnly(True); v.addWidget(self.result2, 1)
+        return w
+
+    def _tab_about(self):
+        w = W.QWidget(); v = W.QVBoxLayout(w)
+        t = W.QTextBrowser(); t.setOpenExternalLinks(True)
+        t.setHtml(L(
+            f"<h2>أين سُجِّل؟ (Ayna) {APP_VERSION}</h2><p>تحديد مكان تسجيل صوتي أو فيديو من بصمات دوبلر غير المسموعة لمراوح الطائرات العابرة، بمطابقتها مع سجلات الطيران العامة (ADS-B). "
+            f"يُستخدم للتحقق الجنائي من مكان تسجيل مُدَّعى، ولحماية خصوصيتك بإزالة هذه البصمة قبل النشر.</p>"
+            f"<p><b>المطوّر:</b> {DEVELOPER}</p><p>الكود: <a href='https://github.com/kmkholm/overpass'>github.com/kmkholm/overpass</a> — مبني على dopplertrack (MIT).</p>"
+            f"<p>مجلد العمل والتقارير: {CACHE}</p>",
+            f"<h2>Ayna {APP_VERSION}</h2><p>Finds where an audio or video recording was made from the inaudible Doppler signatures of passing propeller aircraft, matched against public ADS-B flight tracks. "
+            f"For forensic verification of a claimed recording location, and for removing that leak from your own recordings before publishing.</p>"
+            f"<p><b>Developer:</b> {DEVELOPER}</p><p>Code: <a href='https://github.com/kmkholm/overpass'>github.com/kmkholm/overpass</a> — built on dopplertrack (MIT).</p>"
+            f"<p>Work folder and reports: {CACHE}</p>"))
+        v.addWidget(t, 1)
+        btn = W.QPushButton(L("English", "العربية")); btn.clicked.connect(self._switch_lang); v.addWidget(btn)
+        return w
+
+    def _switch_lang(self):
+        json.dump({"lang": "en" if LANG == "ar" else "ar"}, open(SETTINGS, "w"))
+        W.QMessageBox.information(self, "Ayna", L("سيُعاد تشغيل البرنامج بالإنجليزية.", "The app will restart in Arabic."))
+        os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # -- runs
+    def _busy(self, on: bool):
+        self.run_btn.setEnabled(not on); self.scrub_btn.setEnabled(not on)
+
+    def start_locate(self):
+        p = self.loc_file.text().strip()
+        if not p or not Path(p).exists():
+            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً.", "Choose a valid file.")); return
+        try:
+            lat, lon = float(self.lat.text()), float(self.lon.text())
+        except ValueError:
+            W.QMessageBox.warning(self, "Ayna", L("الإحداثيات غير صالحة.", "Invalid coordinates.")); return
+        date = self.date.date().toString("yyyy-MM-dd")
+        if datetime.strptime(date, "%Y-%m-%d").date() >= datetime.now(timezone.utc).date():
+            W.QMessageBox.warning(self, "Ayna", L("أرشيف الطيران ليوم ما يتوفر بعد يوم على الأقل. اختر تاريخاً أقدم.",
+                                                   "A day's flight archive appears at least one day later. Pick an earlier date.")); return
+        kind = "verify" if self.mode.currentIndex() == 0 else "search"
+        job = {"kind": kind, "path": p, "date": date, "center": (lat, lon), "n_events": self.nev.value()}
+        if kind == "search":
+            from overpass.benchmark import bbox_around
+            job["bbox"] = bbox_around(lat, lon, float(self.side.value()))
+        self.result.clear(); self.img.clear(); self.open_pdf.setEnabled(False); self.open_map.setEnabled(False)
+        self._launch(job, self.bar, self.status, self._locate_done)
+
+    def start_scrub(self):
+        p = self.scrub_file.text().strip()
+        if not p or not Path(p).exists():
+            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً.", "Choose a valid file.")); return
+        self.result2.clear()
+        self._launch({"kind": "scrub", "path": p}, self.bar2, self.status2, self._scrub_done)
+
+    def _launch(self, job, bar, status, on_done):
+        self._busy(True); bar.setValue(1); status.setText(L("بدأ العمل…", "Working…"))
+        self.worker = Worker(job); self.thread = threading.Thread(target=self.worker.run, daemon=True)
+        self.worker.progress.connect(lambda p, m: (bar.setValue(p), status.setText(m)))
+        self.worker.done.connect(lambda r: (bar.setValue(100), self._busy(False), on_done(r)))
+        self.worker.failed.connect(lambda tb: (self._busy(False), status.setText(L("فشل.", "Failed.")),
+                                               W.QMessageBox.critical(self, "Ayna", tb[-1500:])))
+        self.thread.start()
+
+    def _locate_done(self, r: dict):
+        self._pdf = r["pdf"]; self._best = (r["lat"], r["lon"])
+        lines = [L(f"أفضل نقطة: {r['lat']:.5f}, {r['lon']:.5f} (درجة {r['score']:.2f})", f"Best point: {r['lat']:.5f}, {r['lon']:.5f} (score {r['score']:.2f})"),
+                 L(f"عدد الطائرات المستخدمة: {r['n_events']} — نقاط الشبكة المقيّمة: {r['n_points']}", f"Aircraft events used: {r['n_events']} — grid points scored: {r['n_points']}"),
+                 L(f"مساحة مجموعة الثقة (درجة ≥ الأفضل − 1): {r['area_km2']:.2f} كم²", f"Confidence set area (score ≥ best − 1): {r['area_km2']:.2f} km²")]
+        if r.get("claimed_rank") is not None:
+            lines.append(L(f"ترتيب النقطة المُدَّعاة بين نقاط الجوار: {r['claimed_rank']}", f"Rank of the claimed point among its neighbourhood: {r['claimed_rank']}"))
+        elif r.get("claimed_rank") is None and "claimed" in str(r):
+            pass
+        lines.append(L(f"التقرير: {r['pdf']}", f"Report: {r['pdf']}"))
+        self.result.setPlainText("\n".join(lines))
+        pix = QtGui.QPixmap(r["png"]); self.img.setPixmap(pix.scaled(self.img.size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+        self.open_pdf.setEnabled(True); self.open_map.setEnabled(True)
+        self.status.setText(L("اكتمل.", "Done."))
+
+    def _scrub_done(self, r: dict):
+        lines = [L(f"عدد الطائرات المكتشفة: {r['n_events']}", f"Aircraft events found: {r['n_events']}")]
+        for (t, f0), (b, a) in zip(r["events"], r["before_after"]):
+            lines.append(L(f"  حدث عند {t:.0f} ث، أساسي {f0:.0f} Hz: تباين البصمة {b:.1f} → {a:.1f} dB", f"  event at {t:.0f} s, f0 {f0:.0f} Hz: comb contrast {b:.1f} → {a:.1f} dB"))
+        lines.append(L(f"الملف المنظّف: {r['out']}", f"Cleaned file: {r['out']}"))
+        if r["n_events"] == 0:
+            lines.append(L("لم تُكتشف بصمة طائرات؛ الملف منسوخ كما هو.", "No aircraft comb was detected; the file was copied unchanged."))
+        self.result2.setPlainText("\n".join(lines)); self.status2.setText(L("اكتمل.", "Done."))
+
+    def _open(self, path):
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+
+    def _gmaps(self):
+        la, lo = self._best
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"https://www.google.com/maps?q={la:.6f},{lo:.6f}"))
+
+
+def main():
+    app = W.QApplication(sys.argv)
+    app.setApplicationName("Ayna")
+    m = Main(); m.show()
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()
