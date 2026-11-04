@@ -75,6 +75,31 @@ def fig_scoremap(work, clip, cfg, lat, lon, q, spacing, out):
     fig.tight_layout(); fig.savefig(out / f"fig_scoremap_{clip}.pdf"); fig.savefig(out / f"fig_scoremap_{clip}.png", dpi=300); plt.close(fig)
 
 
+def fig_scoremap_ref(ref_dir, lat, lon, out, icao1="a1dfeb", icao2="ace391", radius_m=4000):
+    """Two panels for the reference recording from results/ref/search_full(.refined).csv: identification score of the best
+    tuple per cell over the whole box, and the localisation score of the true pair's cells around the truth."""
+    from dopplertrack.geo import haversine_m
+    ref_dir = Path(ref_dir)
+    r = pd.read_csv(ref_dir / "search_full.csv"); best = r.sort_values("score", ascending=False).drop_duplicates("gidx")
+    fine = pd.read_csv(ref_dir / "search_full_refined.csv")
+    fig, ax = plt.subplots(1, 2, figsize=(6.6, 3.0))
+    sc = ax[0].scatter(best.lon, best.lat, c=best.score, s=2.5, cmap="cividis", vmin=0, vmax=np.percentile(best.score, 99.5))
+    plt.colorbar(sc, ax=ax[0], shrink=0.85).set_label("identification score")
+    ax[0].plot(lon, lat, "+", color="#E63946", ms=11, mew=1.6); ax[0].set_xlabel("longitude"); ax[0].set_ylabel("latitude")
+    ax[0].set_aspect(1 / np.cos(np.radians(lat))); ax[0].set_title("100 × 150 km search, 200 m grid", fontsize=9)
+    w = r[(r.icao1 == icao1) & (r.icao2 == icao2)]
+    w = w[haversine_m(w.lat.to_numpy(), w.lon.to_numpy(), lat, lon) <= radius_m]
+    sc2 = ax[1].scatter(w.lon, w.lat, c=w.score_loc, s=40, cmap="cividis", marker="s")
+    plt.colorbar(sc2, ax=ax[1], shrink=0.85).set_label("localisation score")
+    top = w.sort_values("score_loc", ascending=False).iloc[0]
+    ax[1].plot(top.lon, top.lat, "o", mfc="none", mec="#1F6F8B", ms=9, mew=1.6, label="chosen cell")
+    ft = fine.iloc[0]; ax[1].plot(ft.lon, ft.lat, "^", color="#1F6F8B", ms=6, label="refined, 50 m")
+    ax[1].plot(lon, lat, "+", color="#E63946", ms=12, mew=1.8, label="true location")
+    ax[1].set_aspect(1 / np.cos(np.radians(lat))); ax[1].set_xlabel("longitude")
+    ax[1].set_title(f"cells of the true flight pair, ± {radius_m // 1000} km", fontsize=9); ax[1].legend(frameon=False, fontsize=7, loc="lower left")
+    fig.tight_layout(); fig.savefig(out / "fig_scoremap_ref_oysterbay.pdf"); fig.savefig(out / "fig_scoremap_ref_oysterbay.png", dpi=300); plt.close(fig)
+
+
 def fig_scrub(work, clip, out):
     from dopplertrack.audio import load_audio, compute_spectrogram
     import soundfile as sf
@@ -109,14 +134,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", default="work"); ap.add_argument("--bench"); ap.add_argument("--conformal"); ap.add_argument("--scrub")
     ap.add_argument("--model"); ap.add_argument("--clip", default="ref_oysterbay"); ap.add_argument("--out", default="figures")
-    ap.add_argument("--q", type=float, default=1.0); ap.add_argument("--spacing", type=float, default=200.0)
+    ap.add_argument("--ref", default="results/ref"); ap.add_argument("--q", type=float, default=1.0); ap.add_argument("--spacing", type=float, default=200.0)
     a = ap.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     if a.model: fig_roc(a.model, out)
     if a.bench:
         bench = pd.read_csv(a.bench); fig_error_cdf(bench, out)
         r = bench[(bench.clip_id == a.clip) & (bench.config == "full") & (bench.seed == 0)]
-        if len(r): fig_scoremap(a.work, a.clip, "full", float(r.lat_true.iloc[0]), float(r.lon_true.iloc[0]), a.q, a.spacing, out)
+        if len(r) and a.clip == "ref_oysterbay" and (Path(a.ref) / "search_full_refined.csv").exists():
+            fig_scoremap_ref(a.ref, float(r.lat_true.iloc[0]), float(r.lon_true.iloc[0]), out)
+        elif len(r): fig_scoremap(a.work, a.clip, "full", float(r.lat_true.iloc[0]), float(r.lon_true.iloc[0]), a.q, a.spacing, out)
     if a.conformal: fig_conformal(pd.read_csv(a.conformal), out)
     if a.scrub:
         fig_scrub_bars(pd.read_csv(a.scrub), out)
