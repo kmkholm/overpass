@@ -1,0 +1,14 @@
+stream_id,url,lat,lon,region,place,split,truth_sigma_m
+us_key_west_d,ytsearch:Key West live cam Southernmost Point,24.54650,-81.79760,US,"Southernmost Point, Key West FL",calib,80
+us_times_square_d,ytsearch:EarthCam Times Square live 4K,40.75800,-73.98550,US,"Times Square, New York NY",calib,100
+us_chatham_pier_d,ytsearch:Chatham Fish Pier live cam Cape Cod,41.68000,-69.94700,US,"Chatham Fish Pier, MA",calib,100
+us_boothbay_d,ytsearch:Boothbay Harbor live cam Maine,43.85200,-69.62800,US,"Boothbay Harbor, ME",calib,150
+us_myrtle_beach_d,ytsearch:Myrtle Beach boardwalk live cam,33.69000,-78.88400,US,"Myrtle Beach boardwalk, SC",calib,100
+us_hilton_head_d,ytsearch:Hilton Head Coligny Beach live cam,32.13700,-80.73300,US,"Coligny Beach, Hilton Head SC",calib,150
+us_seaside_or_d,ytsearch:Seaside Oregon live cam promenade,45.99300,-123.92900,US,"Seaside, OR",calib,150
+us_provincetown_d,ytsearch:Provincetown live cam MacMillan Pier,42.05100,-70.18300,US,"MacMillan Pier, Provincetown MA",calib,100
+us_bar_harbor_d,ytsearch:Bar Harbor Maine live cam,44.38800,-68.20400,US,"Bar Harbor, ME",calib,150
+us_clearwater_d,ytsearch:Clearwater Beach live cam,27.97700,-82.82700,US,"Clearwater Beach, FL",calib,150
+us_asheville_d,ytsearch:Asheville live cam downtown,35.59500,-82.55100,US,"Asheville, NC",calib,200
+us_st_augustine_d,ytsearch:St Augustine live cam bridge of lions,29.89300,-81.31000,US,"St Augustine, FL",calib,150
+us_galveston_d,ytsearch:Galveston seawall live cam,29.28300,-94.78800,US,"Galveston, TX",calib,150

@@ -31,7 +31,7 @@ def resolve(url: str) -> dict | None:
         # audio-only formats only (YouTube live offers audio-only HLS); live HLS reports acodec=None, so only
         # an explicit "none" is rejected and ffmpeg's result decides
         out = subprocess.run([sys.executable, "-m", "yt_dlp", "-j", "--no-playlist", "--ignore-errors",
-                              "-f", "bestaudio", target], capture_output=True, text=True, timeout=240)
+                              "-f", "bestaudio", target], capture_output=True, text=True, timeout=240)  # noqa: E501
         for line in out.stdout.splitlines():
             try:
                 j = json.loads(line)
@@ -71,8 +71,15 @@ def main():
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     streams = list(csv.DictReader(open(a.streams, newline="", encoding="utf-8")))
     print(f"{len(streams)} streams; resolving ...")
-    with ThreadPoolExecutor(a.parallel) as ex:
-        resolved = list(ex.map(lambda s: resolve(s["url"]), streams))
+    import time
+    for attempt in range(5):
+        with ThreadPoolExecutor(a.parallel) as ex:
+            resolved = list(ex.map(lambda s: resolve(s["url"]), streams))
+        if any(resolved) or attempt == 4:
+            break
+        # nothing resolved at all: almost always YouTube's temporary "confirm you're not a bot" block of this address
+        print(f"  no stream resolved (attempt {attempt + 1}); waiting 15 min before retrying", flush=True)
+        time.sleep(900)
     # a search can land on a multi-camera compilation or a stream with a music bed; neither is one place with ambient sound
     BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "mix ", "lofi", "radio", "camera feeds", "the world live", "earthtv", "4k |")
     def usable(r):
