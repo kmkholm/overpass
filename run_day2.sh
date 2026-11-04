@@ -40,7 +40,8 @@ SUB=$(python -c "import pandas as pd;f=pd.read_csv('results/feasibility.csv');pr
 python experiments/run_benchmark.py --manifest data/manifest.csv --work work --model models/ridgenet.pt --out results/bench.csv \
     --configs nodem scan --seeds 0 --region-km 100 --spacing 300 --no-fetch --clips $SUB >> logs/bench2.log 2>&1 || log "benchmark (subset) returned $?"
 log "conformal"
-python experiments/calibrate_eval.py --manifest data/manifest.csv --work work --bench results/bench.csv --config full --seed 0 --out results/conformal.csv > logs/conformal2.log 2>&1 || log "conformal returned $?"
+python experiments/calibrate_eval.py --manifest data/manifest.csv --work work --bench results/bench.csv --config full --seed 0 --out results/conformal_all.csv > logs/conformal2.log 2>&1 || log "conformal (all) returned $?"
+python experiments/calibrate_eval.py --manifest data/manifest.csv --work work --bench results/bench.csv --config full --seed 0 --feasible results/feasibility.csv --out results/conformal.csv >> logs/conformal2.log 2>&1 || log "conformal (feasible) returned $?"
 log "scrub"
 python experiments/scrub_eval.py --manifest data/manifest.csv --work work --speech data/speech_16k.wav --out results/scrub.csv > logs/scrub2.log 2>&1 || log "scrub returned $?"
 log "figures"

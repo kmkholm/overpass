@@ -24,10 +24,17 @@ def main():
     ap.add_argument("--bench", required=True); ap.add_argument("--config", default="full"); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--alphas", nargs="+", type=float, default=[0.1, 0.2]); ap.add_argument("--spacing", type=float, default=200.0)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--feasible", help="feasibility.csv: keep only clips with >= 2 real passes (the set on which coverage is meaningful)")
+    ap.add_argument("--min-score", type=float, default=None, help="identification-score gate: drop clips whose top score is below it")
     a = ap.parse_args()
     man = load_manifest(a.manifest).set_index("clip_id")
     bench = pd.read_csv(a.bench)
     bench = bench[(bench.config == a.config) & (bench.seed == a.seed) & (bench.status == "ok")]
+    if a.feasible:
+        feas = pd.read_csv(a.feasible); ok = set(feas[feas.n_passes >= 2].clip_id)
+        bench = bench[bench.clip_id.isin(ok)]
+    if a.min_score is not None:
+        bench = bench[bench.top_score >= a.min_score]
     items = {}
     for r in bench.itertuples():
         p = Path(a.work) / f"{r.clip_id}.{a.config}.s{a.seed}.res.csv"
@@ -47,7 +54,7 @@ def main():
         for kind, q in (("gap", qg), ("radius", qr)):
             ev = CF.evaluate_sets(test, q, a.spacing, kind=kind)
             ev["alpha"] = alpha; ev["q"] = q
-            ev["region"] = [items[c]["region"] for c in ev.clip]
+            ev["region"] = [items[c]["region"] for c in ev["clip"]]
             rows.append(ev)
             for reg, g in ev.groupby("region"):
                 summary[f"{kind}_a{alpha}_{reg}"] = {"coverage": float(g.covered.mean()), "median_area_km2": float(g.area_km2.median()), "n": int(len(g))}
