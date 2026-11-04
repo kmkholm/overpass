@@ -7,11 +7,14 @@ public class W32 { [DllImport("user32.dll")] public static extern bool GetWindow
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; } }
 "@
-$exe = Join-Path $PSScriptRoot "dist\Ayna.exe"
+$exe = Join-Path $PSScriptRoot "dist_v2\Ayna.exe"
+$t0 = Get-Date
 $p = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds $Wait
-$w = Get-Process -Name Ayna -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if (-not $w) { "no window"; Get-Process -Name Ayna -ErrorAction SilentlyContinue | Stop-Process -Force; exit 1 }
+# only the instance started here (the user may have another copy open)
+$mine = Get-Process -Name Ayna -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -ge $t0.AddSeconds(-2) }
+$w = $mine | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+if (-not $w) { "no window"; $mine | Stop-Process -Force -ErrorAction SilentlyContinue; exit 1 }
 [W32]::SetForegroundWindow($w.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 800
 $r = New-Object W32+RECT; [W32]::GetWindowRect($w.MainWindowHandle, [ref]$r) | Out-Null
 $bw = $r.R - $r.L; $bh = $r.B - $r.T
@@ -20,4 +23,4 @@ $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($r.L, $r.T, 0
 $full = Join-Path $PSScriptRoot $Out
 $bmp.Save($full, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
 "saved $full ($bw x $bh) title: $($w.MainWindowTitle)"
-Get-Process -Name Ayna -ErrorAction SilentlyContinue | Stop-Process -Force
+$mine | Stop-Process -Force -ErrorAction SilentlyContinue

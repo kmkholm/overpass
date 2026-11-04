@@ -52,8 +52,10 @@ QPushButton#primary:hover {{ background: {ACCENT_D}; }}
 QPushButton#primary:disabled {{ background: #9FC3D0; }}
 QProgressBar {{ border: 1px solid {LINE}; border-radius: 7px; background: {PANEL}; height: 16px; text-align: center; color: {INK}; }}
 QProgressBar::chunk {{ background: {ACCENT}; border-radius: 6px; }}
-QLabel#header {{ color: white; font-size: 19pt; font-weight: 700; }}
-QLabel#sub {{ color: #D7E6EC; font-size: 10pt; }}
+QFrame#headerbar QLabel {{ background: transparent; }}
+QFrame#headerbar QPushButton {{ background: white; color: {ACCENT_D}; border: none; }}
+QLabel#header {{ color: white; font-size: 19pt; font-weight: 700; background: transparent; }}
+QLabel#sub {{ color: #D7E6EC; font-size: 10pt; background: transparent; }}
 QLabel#intro {{ color: #3E4A56; padding: 4px 2px 8px 2px; }}
 QLabel#status {{ color: {ACCENT_D}; font-weight: 600; }}
 QFrame#headerbar {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {ACCENT_D}, stop:1 {ACCENT}); border-radius: 10px; }}
