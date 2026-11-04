@@ -20,10 +20,10 @@ from dopplertrack.adsb import Trace
 from dopplertrack.audio import Spectrogram
 from dopplertrack.doppler import speed_of_sound
 from dopplertrack.geo import lla_to_enu
-from dopplertrack.search import Grid, Segment, build_segments, cpa_table, load_cpa_table, save_cpa_table
+from dopplertrack.search import Grid, Segment, build_segments, cpa_table, load_cpa_table, pair_candidates, save_cpa_table
 from dopplertrack.tracks import EventFit
 
-from .contrast import ContrastWindow, contrast_locked_score
+from .contrast import ContrastWindow, contrast_locked_score, extra_score
 
 
 def log(msg):
@@ -104,42 +104,74 @@ def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], gr
         if cpa_cache:
             save_cpa_table(cpa_cache, cpa, fp)
     log(f"{len(cpa)} (point, flight) CPA records")
-    def _ranges(evs):
-        # speed: relative tolerance; slant distance: relative tolerance with an absolute floor, because
-        # the ideal-curve fit of a close pass (a few hundred metres) is far less certain than the fit of a distant one
-        vr = [(e.v * (1 - v_tol), e.v * (1 + v_tol)) for e in evs]
-        dr = [(max(100.0, min(e.d * d_tol[0], e.d - 2000.0)), max(e.d * d_tol[1], e.d + 3000.0)) for e in evs]
-        return vr, dr
-
-    while True:
-        offsets = [e.t_cpa - events[0].t_cpa for e in events[1:]]
-        vr, dr = _ranges(events)
-        cands = chain_candidates(cpa, offsets, tol_s=tol_s, v_ranges=vr, d_ranges=dr, silence_d_m=silence_d_m)
-        log(f"{len(cands)} candidate (point, flight_1..{len(events)}) tuples after offset + silence filters")
-        if len(cands) or len(events) <= 2:
-            break
-        # back off: a chain that no grid point can satisfy contains a false event; drop the weakest fit
-        weakest = min(range(len(events)), key=lambda i: events[i].score)
-        log(f"no candidate for {len(events)} events; dropping the weakest event (t_cpa {events[weakest].t_cpa:.0f} s, score {events[weakest].score:.2f})")
-        events = [e for i, e in enumerate(events) if i != weakest]
-        harmonics = [h for i, h in enumerate(harmonics) if i != weakest]
-    N = len(events)
+    # Anchors and soft extras. The two strongest fits are the anchors: a grid point must hear an
+    # anchor-1-like pass then an anchor-2-like pass at the measured offset (the baseline's two-event
+    # chain). Every further event is *soft*: if a flight consistent with it passes the point at the
+    # right offset it is scored and adds max(z, 0); if not, nothing is added and the point survives.
+    # A badly fitted or spurious third event therefore cannot veto the true location, while every
+    # genuine extra flyover sharpens the ranking.
+    _vr = lambda e: (e.v * (1 - v_tol), e.v * (1 + v_tol))
+    _dr = lambda e: (max(100.0, min(e.d * d_tol[0], e.d - 2000.0)), max(e.d * d_tol[1], e.d + 3000.0))
+    order = sorted(range(N), key=lambda i: -events[i].score)
+    a_idx = sorted(order[:2], key=lambda i: events[i].t_cpa)
+    x_idx = sorted(order[2:], key=lambda i: events[i].t_cpa)
+    e1, e2 = events[a_idx[0]], events[a_idx[1]]
+    dt12 = e2.t_cpa - e1.t_cpa
+    cands = pair_candidates(cpa, dt12, tol_s=tol_s, v1=_vr(e1), d1=_dr(e1), v2=_vr(e2), d2=_dr(e2), silence_d_m=None)
+    log(f"{len(cands)} anchor (point, flight1, flight2) candidates at offset {dt12:.1f} s +- {tol_s:.0f} s")
+    nx = len(x_idx)
+    for k, xi in enumerate(x_idx):
+        ex = events[xi]; off = ex.t_cpa - e1.t_cpa
+        b = cpa[cpa.v.between(*_vr(ex)) & cpa.d.between(*_dr(ex))][["gidx", "seg", "t_heard", "d", "v"]]
+        b = b.rename(columns={"seg": f"xseg{k}", "t_heard": f"xt{k}", "d": f"xd{k}", "v": f"xv{k}"})
+        a = cands[["gidx", "seg1", "seg2", "t_heard1"]].reset_index()
+        m = _bucket_join(a, b, "t_heard1", f"xt{k}", off, tol_s, "") if len(cands) else a.iloc[0:0]
+        if len(m):
+            m = m[(m[f"xseg{k}"] != m.seg1) & (m[f"xseg{k}"] != m.seg2)].copy()
+            m["err"] = (m[f"xt{k}"] - m.t_heard1 - off).abs()
+            m = m.sort_values("err").drop_duplicates("index").set_index("index")
+        for col, fill in ((f"xseg{k}", -1), (f"xt{k}", np.nan), (f"xd{k}", np.nan), (f"xv{k}", np.nan)):
+            cands[col] = (m[col].reindex(cands.index) if len(m) else pd.Series(index=cands.index, dtype=float)).fillna(fill)
+        cands[f"xseg{k}"] = cands[f"xseg{k}"].astype(int)
+        log(f"extra event {k + 1} (t_cpa {ex.t_cpa:.0f} s): a consistent flight at {int((cands[f'xseg{k}'] >= 0).sum())} of {len(cands)} candidates")
+    if silence_d_m is not None and len(cands):
+        near = cpa[(cpa.d <= silence_d_m) & cpa.gidx.isin(cands.gidx.unique())][["gidx", "seg", "t_heard"]]
+        xcols = [f"xseg{k}" for k in range(nx)]
+        x = cands.reset_index()[["index", "gidx", "seg1", "seg2", "t_heard1", "t_heard2"] + xcols].merge(near, on="gidx")
+        other = ((x.seg != x.seg1) & (x.seg != x.seg2)).to_numpy()
+        for col in xcols:
+            other &= (x.seg != x[col]).to_numpy()
+        inside = ((x.t_heard > x.t_heard1 + 40.0) & (x.t_heard < x.t_heard2 - 40.0)).to_numpy()
+        bad = x[other & inside]["index"].unique()
+        cands = cands.drop(index=bad)
+        log(f"{len(cands)} candidates after the silence filter between the anchors")
+    cands = cands.reset_index(drop=True)
     if max_candidates and len(cands) > max_candidates:
-        log(f"capping at {max_candidates} candidates (closest CPA-time agreement first)")
-        err = sum(((cands[f"t_heard{k}"] - cands.t_heard1 - offsets[k - 2]).abs() for k in range(2, N + 1)))
+        log(f"capping at {max_candidates} candidates (closest anchor-offset agreement first)")
+        err = (cands.t_heard2 - cands.t_heard1 - dt12).abs()
         cands = cands.loc[np.argsort(err.to_numpy())[:max_candidates]].reset_index(drop=True)
-    wins = [ContrastWindow.from_fit(sp, e, h) for e, h in zip(events, harmonics)]
+    wins_a = [ContrastWindow.from_fit(sp, e1, harmonics[a_idx[0]]), ContrastWindow.from_fit(sp, e2, harmonics[a_idx[1]])]
+    wins_x = [ContrastWindow.from_fit(sp, events[xi], harmonics[xi]) for xi in x_idx]
     out = []; t0 = time.time()
-    segcols = [f"seg{k}" for k in range(1, N + 1)]
     for i, row in enumerate(cands.itertuples(index=False)):
         rs = row._asdict()
-        ss = [segs[int(rs[k])] for k in segcols]
-        tot, zs, sh, raws = contrast_locked_score(wins, ss, grid.enu[int(rs["gidx"])], float(rs["t_heard1"]), c=c, raw=raw_score)
+        obs = grid.enu[int(rs["gidx"])]
+        ss = [segs[int(rs["seg1"])], segs[int(rs["seg2"])]]
+        tot, zs, sh, raws = contrast_locked_score(wins_a, ss, obs, float(rs["t_heard1"]), c=c, raw=raw_score)
         rec = {"gidx": int(rs["gidx"]), "lat": grid.lat[int(rs["gidx"])], "lon": grid.lon[int(rs["gidx"])], "score": tot, "shift": sh}
-        for k in range(1, N + 1):
-            rec[f"seg{k}"] = int(rs[f"seg{k}"]); rec[f"icao{k}"] = ss[k - 1].icao
-            rec[f"z{k}"] = zs[k - 1]; rec[f"raw{k}"] = raws[k - 1]
+        for k in (1, 2):
+            rec[f"seg{k}"] = int(rs[f"seg{k}"]); rec[f"icao{k}"] = ss[k - 1].icao; rec[f"z{k}"] = zs[k - 1]; rec[f"raw{k}"] = raws[k - 1]
             rec[f"t_heard{k}"] = float(rs[f"t_heard{k}"]); rec[f"d{k}"] = float(rs[f"d{k}"]); rec[f"v{k}"] = float(rs[f"v{k}"])
+        t0_map = e1.t_cpa - float(rs["t_heard1"])
+        for k in range(nx):
+            j = k + 3; xs = int(rs[f"xseg{k}"])
+            if xs >= 0:
+                zk, rk = extra_score(wins_x[k], segs[xs], obs, t0_map, sh, c=c, raw=raw_score)
+                rec["score"] += max(zk, 0.0)
+                rec.update({f"seg{j}": xs, f"icao{j}": segs[xs].icao, f"z{j}": zk, f"raw{j}": rk, f"t_heard{j}": float(rs[f"xt{k}"]),
+                            f"d{j}": float(rs[f"xd{k}"]), f"v{j}": float(rs[f"xv{k}"])})
+            else:
+                rec.update({f"seg{j}": -1, f"icao{j}": "", f"z{j}": 0.0, f"raw{j}": 0.0, f"t_heard{j}": np.nan, f"d{j}": np.nan, f"v{j}": np.nan})
         out.append(rec)
         if progress and (i + 1) % 500 == 0:
             log(f"scored {i + 1}/{len(cands)} ({(time.time() - t0) / (i + 1) * 1000:.0f} ms each)")
@@ -147,28 +179,35 @@ def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], gr
     if len(res):
         res = res.sort_values("score", ascending=False).reset_index(drop=True)
     res.attrs["lat0"] = grid.lat0; res.attrs["lon0"] = grid.lon0
-    res.attrs["events"] = events; res.attrs["harmonics"] = harmonics     # the events actually used after back-off
+    res.attrs["events"] = [e1, e2] + [events[xi] for xi in x_idx]
+    res.attrs["harmonics"] = [harmonics[a_idx[0]], harmonics[a_idx[1]]] + [harmonics[xi] for xi in x_idx]
     return res, segs
 
 
 def refine_n(sp: Spectrogram, events: list[EventFit], segs: list[Segment], row, lat0: float, lon0: float,
              spacing_m: float = 50.0, half_m: float = 400.0, harmonics=None, elevation=None, c=None, raw_score=False):
-    """Fine grid around one result row for one flight tuple."""
+    """Fine grid around one result row. `events` in the order of res.attrs["events"]: two anchors
+    then the soft extras; extras whose seg is -1 in the row are skipped."""
     c = speed_of_sound() if c is None else c
-    events = sorted(events, key=lambda e: e.t_cpa); N = len(events)
+    N = len(events)
     harmonics = harmonics or [1] * N
     lat, lon = float(row["lat"]), float(row["lon"])
     dlat = half_m / 111320.0; dlon = half_m / (111320.0 * np.cos(np.radians(lat)))
     g = Grid.make(lat - dlat, lat + dlat, lon - dlon, lon + dlon, spacing_m, elevation)
-    ss = [segs[int(row[f"seg{k}"])] for k in range(1, N + 1)]
-    wins = [ContrastWindow.from_fit(sp, e, h) for e, h in zip(events, harmonics)]
+    ss = [segs[int(row["seg1"])], segs[int(row["seg2"])]]
+    wins = [ContrastWindow.from_fit(sp, events[0], harmonics[0]), ContrastWindow.from_fit(sp, events[1], harmonics[1])]
+    extras = [(ContrastWindow.from_fit(sp, events[k], harmonics[k]), segs[int(row[f"seg{k + 1}"])])
+              for k in range(2, N) if f"seg{k + 1}" in row and int(row[f"seg{k + 1}"]) >= 0]
     rows = []
     for i in range(len(g)):
         obs = lla_to_enu(g.lat[i], g.lon[i], g.elev[i], lat0, lon0)
         d = np.linalg.norm(ss[0].enu - obs, axis=1); j = int(np.argmin(d)); t_heard1 = ss[0].t[j] + d[j] / c
         tot, zs, sh, _ = contrast_locked_score(wins, ss, obs, float(t_heard1), c=c, raw=raw_score)
-        rows.append((g.lat[i], g.lon[i], tot, sh, *zs))
-    cols = ["lat", "lon", "score", "shift"] + [f"z{k}" for k in range(1, N + 1)]
+        t0_map = events[0].t_cpa - float(t_heard1)
+        zx = [extra_score(w, s, obs, t0_map, sh, c=c, raw=raw_score)[0] for w, s in extras]
+        tot += sum(max(z, 0.0) for z in zx)
+        rows.append((g.lat[i], g.lon[i], tot, sh, *zs, *zx))
+    cols = ["lat", "lon", "score", "shift", "z1", "z2"] + [f"z{k + 3}" for k in range(len(extras))]
     return pd.DataFrame(rows, columns=cols).sort_values("score", ascending=False).reset_index(drop=True)
 
 

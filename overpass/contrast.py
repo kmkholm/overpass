@@ -85,6 +85,19 @@ class ContrastWindow(EventWindow):
         return z, raw
 
 
+def extra_score(win: ContrastWindow, seg: Segment, obs_enu, t0_map: float, shift: float, c: float | None = None,
+                f0_scales=np.arange(0.95, 1.0501, 0.005), raw: bool = False) -> tuple[float, float]:
+    """Score of one additional ("soft") event at the time shift already locked by the anchors.
+    Returns (z, raw); z is what the search adds (clipped at zero by the caller)."""
+    c = speed_of_sound() if c is None else c
+    to, r = modelled_curve(seg, obs_enu, c)
+    if raw:
+        rk = win.sweep_scores(to + t0_map, r, [shift], f0_scales); k = int(np.argmax(rk)); return float(rk[0, k]), float(rk[0, k])
+    zk, rk = win.z_scores(to + t0_map, r, [shift], f0_scales)
+    k = int(np.argmax(zk))
+    return float(zk[0, k]), float(rk[0, k])
+
+
 def contrast_locked_score(wins: list[ContrastWindow], segs: list[Segment], obs_enu, t_heard1: float,
                           c: float | None = None, shifts=np.arange(-14, 14.01, 0.5),
                           f0_scales=np.arange(0.95, 1.0501, 0.005), raw: bool = False):
