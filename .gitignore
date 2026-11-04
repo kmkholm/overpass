@@ -10,3 +10,8 @@ __pycache__/
 .venv/
 data/*.flac
 data/*.webm
+app/dist/
+app/build/
+app/*.spec
+app/bin/
+app/models/

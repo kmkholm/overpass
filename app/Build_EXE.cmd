@@ -11,7 +11,8 @@ if not exist bin\ffmpeg.exe (
   echo copying ffmpeg from imageio-ffmpeg ...
   "%PY%" -c "import imageio_ffmpeg, shutil, os; os.makedirs('bin', exist_ok=True); shutil.copy(imageio_ffmpeg.get_ffmpeg_exe(), 'bin/ffmpeg.exe')" || goto :fail
 )
-set "OPTS=--noconfirm --clean --onefile --windowed --name Ayna --add-binary bin\ffmpeg.exe;bin --add-data models;models --hidden-import overpass --hidden-import dopplertrack --exclude-module torch --exclude-module torchvision --exclude-module PySide6 --exclude-module PyQt6 --exclude-module tkinter --exclude-module PyQt5.QtWebEngineWidgets --exclude-module IPython --exclude-module jupyter"
+set "DT=%~dp0..\..\..\systmatic review\dopplertrack\src"
+set "OPTS=--noconfirm --clean --onefile --windowed --name Ayna --paths .. --paths "%DT%" --add-binary bin\ffmpeg.exe;bin --add-data models;models --collect-submodules overpass --collect-submodules dopplertrack --hidden-import soundfile --hidden-import onnxruntime --hidden-import PIL --exclude-module torch --exclude-module torchvision --exclude-module PySide6 --exclude-module PyQt6 --exclude-module tkinter --exclude-module PyQt5.QtWebEngineWidgets --exclude-module IPython --exclude-module jupyter --exclude-module pytest --exclude-module matplotlib.tests"
 "%PY%" -m PyInstaller %OPTS% ayna.py || goto :fail
 echo.
 echo Done: dist\Ayna.exe
