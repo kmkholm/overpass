@@ -74,7 +74,7 @@ def main():
     with ThreadPoolExecutor(a.parallel) as ex:
         resolved = list(ex.map(lambda s: resolve(s["url"]), streams))
     # a search can land on a multi-camera compilation or a stream with a music bed; neither is one place with ambient sound
-    BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "mix ", "lofi", "radio")
+    BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "mix ", "lofi", "radio", "camera feeds", "the world live", "earthtv", "4k |")
     def usable(r):
         t = _ascii(r.get("title", "")).lower()
         return not any(b in t for b in BAD)

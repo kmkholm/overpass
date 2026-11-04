@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "lofi", "radio")
+BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "lofi", "radio", "camera feeds", "the world live", "earthtv", "4k |")
 
 
 def verdict(notes: str) -> str:
