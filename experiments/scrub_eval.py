@@ -63,7 +63,7 @@ def main():
         if speech is not None:
             rep = int(np.ceil(len(x) / len(speech))); mix = np.tile(speech, rep)[:len(x)]
             x = (x + 0.5 * mix / (np.abs(mix).max() + 1e-6) * (np.abs(x).max() + 1e-6)).astype(np.float32)
-        tracks = [SC.track_from_event(sp, e, harmonics=3) for e in evs]
+        tracks = [SC.track_from_event(sp, e, harmonics=4) for e in evs]
         for name in a.defences:
             try:
                 y = apply(name, x, sr, tracks)

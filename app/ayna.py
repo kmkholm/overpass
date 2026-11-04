@@ -273,7 +273,7 @@ class Worker(QtCore.QObject):
         events = self._events(sp, key, top=6)
         self.progress.emit(50, L("إزالة بصمة الطائرات من الصوت…", "Removing the aircraft comb from the audio…"))
         x, sr = load_audio(j["path"], sr=16000)
-        tracks = [SC.track_from_event(sp, e, harmonics=3) for e in events]
+        tracks = [SC.track_from_event(sp, e, harmonics=4) for e in events]
         y = SC.scrub(x, sr, tracks, mode="fill") if tracks else x
         out = str(Path(j["path"]).with_name(Path(j["path"]).stem + "_clean.wav"))
         sf.write(out, y, sr)
