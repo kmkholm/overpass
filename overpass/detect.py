@@ -128,17 +128,20 @@ class OnnxRidge:
     """Thin wrapper so predict_map can take either a torch model or an ONNX session."""
 
     def __init__(self, path):
+        import os
         import onnxruntime as ort
-        self.sess = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+        so = ort.SessionOptions(); so.intra_op_num_threads = max(1, (os.cpu_count() or 2))
+        self.sess = ort.InferenceSession(str(path), so, providers=["CPUExecutionProvider"])
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
         logit = self.sess.run(["logit"], {"x": x.astype(np.float32)})[0]
         return 1.0 / (1.0 + np.exp(-logit))
 
 
-def predict_map(model, sp: Spectrogram, chunk_frames: int = 2048, overlap: int = 64, device: str | None = None) -> np.ndarray:
+def predict_map(model, sp: Spectrogram, chunk_frames: int = 2048, overlap: int = 64, device: str | None = None,
+                progress=None) -> np.ndarray:
     """Ridge probability (F, T) for a whole spectrogram, in overlapping time chunks.
-    `model` is a torch RidgeNet or an OnnxRidge."""
+    `model` is a torch RidgeNet or an OnnxRidge. `progress(frac)` is called after each chunk."""
     F, T = sp.S.shape
     P = np.zeros((F, T), np.float32); Wt = np.zeros(T, np.float32)
     if isinstance(model, OnnxRidge):
@@ -159,6 +162,8 @@ def predict_map(model, sp: Spectrogram, chunk_frames: int = 2048, overlap: int =
         if a > 0: w[:overlap] = np.linspace(0, 1, overlap)
         if b < T: w[-overlap:] = np.minimum(w[-overlap:], np.linspace(1, 0, overlap))
         P[:, a:b] += p * w[None, :]; Wt[a:b] += w
+        if progress:
+            progress(min(b / T, 1.0))
         if b == T:
             break
     return P / np.maximum(Wt, 1e-6)[None, :]
@@ -219,20 +224,32 @@ def group_harmonics(comps, tol: float = 0.12):
 
 def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, refine: bool = True,
            top: int | None = None, min_len_s: float = 40.0, min_area: int = 60, log=None,
-           min_f0: float = 55.0, min_span: float = 0.10, min_fit_score: float = 1.0) -> list[Detection]:
+           min_f0: float = 55.0, min_span: float = 0.10, min_fit_score: float = 1.0, progress=None,
+           max_fit: int = 24) -> list[Detection]:
     """Full detector: ridge map -> components -> harmonic groups -> EventFit per group."""
     c = speed_of_sound() if c is None else c
-    P = predict_map(model, sp)
+    P = predict_map(model, sp, progress=progress)
     comps = components(P, sp, thr, min_len_s, min_area)
-    dets = []
+    groups = []
     for (a, harm, members) in group_harmonics(comps):
         t0, t1, flo, fhi, prob, area = a
-        area = sum(m[5] for m in members)
         fc = 0.5 * (flo + fhi)
         # a propeller fundamental lies above ~55 Hz and a flyover sweeps by at least 2v/c (>= 10 %);
         # flat ridges (machinery, hum residue) and sub-55 Hz rumble are not flyovers
         if fc < min_f0 or (fhi - flo) / fc < min_span:
             continue
+        groups.append((a, harm, members))
+    # the ideal-curve fit is the expensive part (seconds per group): fit only the strongest
+    # `max_fit` sweeping groups by ridge evidence (mean probability x sqrt(area) x relative sweep)
+    groups.sort(key=lambda g: -(g[0][4] * np.sqrt(sum(m[5] for m in g[2])) * (g[0][3] - g[0][2]) / (0.5 * (g[0][2] + g[0][3]))))
+    groups = groups[:max_fit]
+    dets = []
+    for gi, (a, harm, members) in enumerate(groups):
+        if progress:
+            progress(1.0 + (gi + 1) / max(len(groups), 1))      # >1: fitting phase
+        t0, t1, flo, fhi, prob, area = a
+        area = sum(m[5] for m in members)
+        fc = 0.5 * (flo + fhi)
         d = Detection(t0, t1, flo, fhi, harm, prob, area)
         if refine:
             try:

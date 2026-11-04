@@ -29,9 +29,39 @@ os.environ.setdefault("DOPPLERTRACK_CACHE", str(CACHE / "cache"))
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets as W
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 DEVELOPER = "Dr. Mohammed Tawfik — kmkhol01@gmail.com"
 SETTINGS = CACHE / "settings.json"
+
+# ----------------------------------------------------------------------------- look
+ACCENT, ACCENT_D, INK, PAPER, PANEL, LINE, OK, WARN = "#1F6F8B", "#155A72", "#1B2430", "#F4F6F8", "#FFFFFF", "#D9DEE3", "#2E8B57", "#C8102E"
+STYLE = f"""
+QMainWindow, QWidget {{ background: {PAPER}; color: {INK}; font-size: 10.5pt; }}
+QTabWidget::pane {{ border: 1px solid {LINE}; border-radius: 8px; background: {PANEL}; top: -1px; }}
+QTabBar::tab {{ background: {PAPER}; color: {INK}; padding: 9px 22px; border: 1px solid {LINE}; border-bottom: none;
+               border-top-left-radius: 8px; border-top-right-radius: 8px; margin-right: 2px; font-weight: 600; }}
+QTabBar::tab:selected {{ background: {PANEL}; color: {ACCENT}; border-color: {LINE}; }}
+QTabBar::tab:hover {{ color: {ACCENT}; }}
+QLineEdit, QDateEdit, QSpinBox, QComboBox, QTextEdit {{ background: {PANEL}; border: 1px solid {LINE}; border-radius: 6px; padding: 6px 8px; selection-background-color: {ACCENT}; }}
+QLineEdit:focus, QDateEdit:focus, QSpinBox:focus, QComboBox:focus {{ border: 1.5px solid {ACCENT}; }}
+QPushButton {{ background: {PANEL}; border: 1px solid {LINE}; border-radius: 8px; padding: 8px 16px; font-weight: 600; }}
+QPushButton:hover {{ border-color: {ACCENT}; color: {ACCENT}; }}
+QPushButton:disabled {{ color: #9AA3AD; }}
+QPushButton#primary {{ background: {ACCENT}; color: white; border: none; font-size: 12pt; }}
+QPushButton#primary:hover {{ background: {ACCENT_D}; }}
+QPushButton#primary:disabled {{ background: #9FC3D0; }}
+QProgressBar {{ border: 1px solid {LINE}; border-radius: 7px; background: {PANEL}; height: 16px; text-align: center; color: {INK}; }}
+QProgressBar::chunk {{ background: {ACCENT}; border-radius: 6px; }}
+QLabel#header {{ color: white; font-size: 19pt; font-weight: 700; }}
+QLabel#sub {{ color: #D7E6EC; font-size: 10pt; }}
+QLabel#intro {{ color: #3E4A56; padding: 4px 2px 8px 2px; }}
+QLabel#status {{ color: {ACCENT_D}; font-weight: 600; }}
+QFrame#headerbar {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {ACCENT_D}, stop:1 {ACCENT}); border-radius: 10px; }}
+QTextEdit#result {{ background: #F8FAFB; font-family: Consolas, 'Courier New'; font-size: 10pt; }}
+QStatusBar {{ background: {PAPER}; color: #5B6673; }}
+QGroupBox {{ border: 1px solid {LINE}; border-radius: 8px; margin-top: 10px; padding: 10px 6px 6px 6px; font-weight: 600; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; color: {ACCENT_D}; }}
+"""
 
 
 def _lang() -> str:
@@ -60,8 +90,35 @@ class Worker(QtCore.QObject):
     def run(self):
         try:
             self.done.emit(self._run())
+        except RuntimeError as e:           # expected, user-facing conditions
+            self.failed.emit(str(e))
         except Exception:
-            self.failed.emit(traceback.format_exc())
+            tb = traceback.format_exc()
+            try:
+                (CACHE / "ayna_error.log").write_text(tb, encoding="utf-8")
+            except Exception:
+                pass
+            self.failed.emit(L("حدث خطأ غير متوقع. التفاصيل في ", "Unexpected error. Details in ") + str(CACHE / "ayna_error.log") + "\n\n" + tb[-600:])
+
+    # -- source: local file or URL (YouTube or any yt-dlp-supported page, or a direct media link)
+    def _source(self, src: str) -> str:
+        if not src.lower().startswith(("http://", "https://")):
+            return src
+        self.progress.emit(2, L("تنزيل الصوت من الرابط…", "Downloading the audio from the link…"))
+        dl = CACHE / "downloads"; dl.mkdir(parents=True, exist_ok=True)
+        try:
+            import yt_dlp
+        except ImportError:
+            raise RuntimeError(L("تنزيل الروابط غير متاح في هذه النسخة.", "Link download is not available in this build."))
+        opts = {"format": "bestaudio/best", "outtmpl": str(dl / "%(id)s.%(ext)s"), "quiet": True, "no_warnings": True,
+                "noplaylist": True, "ffmpeg_location": str(BASE / "bin") if (BASE / "bin").exists() else None}
+        try:
+            with yt_dlp.YoutubeDL({k: v for k, v in opts.items() if v is not None}) as y:
+                info = y.extract_info(src, download=True)
+                path = y.prepare_filename(info)
+        except Exception as e:
+            raise RuntimeError(L("تعذّر تنزيل الرابط: ", "Could not download the link: ") + str(e)[:300])
+        return path
 
     # -- shared steps
     def _spectrogram(self, path: str):
@@ -82,8 +139,14 @@ class Worker(QtCore.QObject):
         else:
             onnx = BASE / "models" / "ridgenet.onnx"
             if onnx.exists():
-                self.progress.emit(15, L("كشف الطائرات العابرة (الكاشف المتعلَّم)…", "Detecting flyovers (learned detector)…"))
-                dets = D.detect(D.OnnxRidge(onnx), sp, top=top)
+                dur_min = float(sp.t[-1] - sp.t[0]) / 60.0
+                self.progress.emit(15, L(f"كشف الطائرات العابرة… (نحو {max(1, dur_min * 0.25):.0f} دقيقة)", f"Detecting flyovers… (about {max(1, dur_min * 0.25):.0f} min)"))
+                def prog(f):
+                    if f <= 1.0:
+                        self.progress.emit(int(15 + 5 * f), L(f"كشف الطائرات العابرة… {f * 100:.0f}%", f"Detecting flyovers… {f * 100:.0f}%"))
+                    else:
+                        self.progress.emit(int(20 + 8 * (f - 1.0)), L(f"توفيق منحنيات دوبلر… {(f - 1) * 100:.0f}%", f"Fitting Doppler curves… {(f - 1) * 100:.0f}%"))
+                dets = D.detect(D.OnnxRidge(onnx), sp, top=top, progress=prog)
             else:
                 self.progress.emit(15, L("كشف الطائرات العابرة (المسح الكلاسيكي، أبطأ)…", "Detecting flyovers (classical scan, slower)…"))
                 from dopplertrack.tracks import detect_events
@@ -109,11 +172,20 @@ class Worker(QtCore.QObject):
             return self._scrub()
         from dopplertrack.terrain import Terrain
         from overpass import nsearch as NS
+        j["path"] = self._source(j["path"])
         sp, key = self._spectrogram(j["path"])
+        dur_min = float(sp.t[-1] - sp.t[0]) / 60.0
         events = self._events(sp, key, top=8)
+        self.progress.emit(25, L(f"وُجد {len(events)} حدث طائرة في {dur_min:.0f} دقيقة", f"{len(events)} aircraft events found in {dur_min:.0f} min"))
         if len(events) < 2:
-            raise RuntimeError(L("وُجد أقل من حدثين لطائرات في التسجيل؛ لا يمكن تحديد الموقع.",
-                                 "Fewer than two aircraft events were found in the recording; the location cannot be fixed."))
+            found = "\n".join(L(f"  حدث عند {e.t_cpa:.0f} ث، أساسي {e.f0:.0f} Hz، سرعة {e.v:.0f} م/ث", f"  event at {e.t_cpa:.0f} s, f0 {e.f0:.0f} Hz, v {e.v:.0f} m/s") for e in events)
+            raise RuntimeError(L(
+                f"وُجد {len(events)} حدث لطائرة في التسجيل (مدته {dur_min:.0f} دقيقة)، والتحديد يحتاج طائرتين عابرتين على الأقل.\n{found}\n\n"
+                "ماذا يساعد: تسجيل أطول (20–60 دقيقة)، في الهواء الطلق أو قرب نافذة، في النهار، في منطقة بها طيران خفيف؛ "
+                "والتأكد أن التاريخ المدخل هو تاريخ التسجيل الحقيقي.",
+                f"{len(events)} aircraft event(s) found in this {dur_min:.0f}-minute recording; fixing a location needs at least two passing aircraft.\n{found}\n\n"
+                "What helps: a longer recording (20–60 min), outdoors or near a window, in daytime, in an area with light aviation; "
+                "and make sure the date entered is the real recording date."))
         events = sorted(events[:j.get("n_events", 3)], key=lambda e: e.t_cpa)
         lat0, lon0 = j["center"]
         traces = self._traces(j["date"], lat0, lon0)
@@ -128,6 +200,7 @@ class Worker(QtCore.QObject):
         if len(res) == 0:
             raise RuntimeError(L("لا يوجد مرشّح يطابق تسلسل الطائرات المسموعة في هذه المنطقة.",
                                  "No candidate in this region matches the sequence of audible aircraft."))
+        import pandas as pd
         best = NS.best_per_point(res)
         tp = NS.top_point(res)
         best = pd.concat([pd.DataFrame([tp]), best[best.gidx != tp.gidx]], ignore_index=True)   # the two-stage answer first
@@ -188,6 +261,7 @@ class Worker(QtCore.QObject):
         from dopplertrack.audio import load_audio
         from overpass import scrub as SC
         j = self.job
+        j["path"] = self._source(j["path"])
         sp, key = self._spectrogram(j["path"])
         events = self._events(sp, key, top=6)
         self.progress.emit(50, L("إزالة بصمة الطائرات من الصوت…", "Removing the aircraft comb from the audio…"))
@@ -206,11 +280,24 @@ class Main(W.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(L("أين سُجِّل؟ — Ayna", "Ayna — Where was this recorded?"))
-        self.resize(980, 720)
+        self.resize(1000, 760)
         if LANG == "ar":
             self.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.setFont(QtGui.QFont("Segoe UI", 10))
-        tabs = W.QTabWidget(); self.setCentralWidget(tabs)
+        self.setStyleSheet(STYLE)
+        icon = BASE / "assets" / "ayna.ico"
+        if icon.exists():
+            self.setWindowIcon(QtGui.QIcon(str(icon)))
+        root = W.QWidget(); self.setCentralWidget(root); v = W.QVBoxLayout(root); v.setContentsMargins(14, 12, 14, 8); v.setSpacing(10)
+        # header bar: name, one-line purpose, language toggle
+        bar = W.QFrame(); bar.setObjectName("headerbar"); h = W.QHBoxLayout(bar); h.setContentsMargins(18, 12, 18, 12)
+        title = W.QLabel(L("أين سُجِّل؟", "Ayna")); title.setObjectName("header")
+        sub = W.QLabel(L("تحديد مكان التسجيل من بصمات دوبلر للطائرات العابرة", "Where was this recording made? Aircraft Doppler fingerprints vs public flight tracks")); sub.setObjectName("sub")
+        tv = W.QVBoxLayout(); tv.setSpacing(2); tv.addWidget(title); tv.addWidget(sub)
+        h.addLayout(tv, 1)
+        lang_btn = W.QPushButton(L("English", "العربية")); lang_btn.setFixedWidth(110); lang_btn.clicked.connect(self._switch_lang); h.addWidget(lang_btn)
+        v.addWidget(bar)
+        tabs = W.QTabWidget(); v.addWidget(tabs, 1)
         tabs.addTab(self._tab_locate(), L("تحقق / بحث", "Verify / Search"))
         tabs.addTab(self._tab_scrub(), L("نظّف تسجيلي", "Clean my recording"))
         tabs.addTab(self._tab_about(), L("حول", "About"))
@@ -220,11 +307,16 @@ class Main(W.QMainWindow):
     # -- helpers
     def _file_row(self, label, attr):
         row = W.QHBoxLayout(); edit = W.QLineEdit(); btn = W.QPushButton(L("اختر ملفاً…", "Browse…"))
+        edit.setPlaceholderText(L("ملف صوت/فيديو، أو رابط YouTube / أي رابط فيديو", "Audio/video file, or a YouTube / any video link"))
         def pick():
             p, _ = W.QFileDialog.getOpenFileName(self, label, "", "Audio/Video (*.mp4 *.mkv *.mov *.m4a *.mp3 *.wav *.flac *.ogg *.webm);;All (*)")
             if p: edit.setText(p)
         btn.clicked.connect(pick); row.addWidget(W.QLabel(label)); row.addWidget(edit, 1); row.addWidget(btn)
         setattr(self, attr, edit); return row
+
+    @staticmethod
+    def _valid_source(s: str) -> bool:
+        return bool(s) and (s.lower().startswith(("http://", "https://")) or Path(s).exists())
 
     def _tab_locate(self):
         w = W.QWidget(); v = W.QVBoxLayout(w)
@@ -232,9 +324,9 @@ class Main(W.QMainWindow):
                            "يحتاج البرنامج إلى الإنترنت لجلب مسارات الطيران وبيانات الارتفاع.",
                            "Load an audio or video file, set the recording date (UTC), then either a claimed point to verify or a search region (up to 150 km). "
                            "Internet access is needed for the flight tracks and the elevation data."))
-        intro.setWordWrap(True); v.addWidget(intro)
+        intro.setWordWrap(True); intro.setObjectName("intro"); v.addWidget(intro)
         v.addLayout(self._file_row(L("الملف:", "File:"), "loc_file"))
-        g = W.QGridLayout(); v.addLayout(g)
+        box = W.QGroupBox(L("إعدادات البحث", "Search settings")); g = W.QGridLayout(box); v.addWidget(box)
         self.date = W.QDateEdit(QtCore.QDate.currentDate().addDays(-2)); self.date.setCalendarPopup(True); self.date.setDisplayFormat("yyyy-MM-dd")
         g.addWidget(W.QLabel(L("تاريخ التسجيل (UTC):", "Recording date (UTC):")), 0, 0); g.addWidget(self.date, 0, 1)
         self.mode = W.QComboBox(); self.mode.addItems([L("تحقق من نقطة مُدَّعاة", "Verify a claimed point"), L("بحث في منطقة", "Search a region")])
@@ -246,11 +338,11 @@ class Main(W.QMainWindow):
         g.addWidget(W.QLabel(L("ضلع منطقة البحث حول النقطة:", "Search box side around the point:")), 2, 0); g.addWidget(self.side, 2, 1)
         self.nev = W.QSpinBox(); self.nev.setRange(2, 5); self.nev.setValue(3)
         g.addWidget(W.QLabel(L("عدد الطائرات المستخدمة:", "Aircraft events used:")), 2, 2); g.addWidget(self.nev, 2, 3)
-        self.run_btn = W.QPushButton(L("ابدأ", "Start")); self.run_btn.setMinimumHeight(36); self.run_btn.clicked.connect(self.start_locate)
+        self.run_btn = W.QPushButton(L("ابدأ التحليل", "Start analysis")); self.run_btn.setObjectName("primary"); self.run_btn.setMinimumHeight(42); self.run_btn.clicked.connect(self.start_locate)
         v.addWidget(self.run_btn)
         self.bar = W.QProgressBar(); self.bar.setRange(0, 100); v.addWidget(self.bar)
-        self.status = W.QLabel(""); self.status.setWordWrap(True); v.addWidget(self.status)
-        self.result = W.QTextEdit(); self.result.setReadOnly(True); self.result.setMaximumHeight(150); v.addWidget(self.result)
+        self.status = W.QLabel(""); self.status.setWordWrap(True); self.status.setObjectName("status"); v.addWidget(self.status)
+        self.result = W.QTextEdit(); self.result.setObjectName("result"); self.result.setReadOnly(True); self.result.setMaximumHeight(150); v.addWidget(self.result)
         self.img = W.QLabel(); self.img.setAlignment(QtCore.Qt.AlignCenter); self.img.setMinimumHeight(260); v.addWidget(self.img, 1)
         row = W.QHBoxLayout()
         self.open_pdf = W.QPushButton(L("افتح التقرير PDF", "Open PDF report")); self.open_pdf.setEnabled(False); self.open_pdf.clicked.connect(lambda: self._open(self._pdf))
@@ -262,12 +354,12 @@ class Main(W.QMainWindow):
         w = W.QWidget(); v = W.QVBoxLayout(w)
         intro = W.QLabel(L("يفحص التسجيل بحثاً عن نغمات مراوح الطائرات غير المسموعة التي تكشف موقعك، ويُخرج نسخة منظّفة (WAV) تحتفظ بالكلام. "
                            "لا يحتاج إلى الإنترنت.", "Checks the recording for the inaudible propeller tones that leak your position and writes a cleaned copy (WAV) that keeps the speech. No internet needed."))
-        intro.setWordWrap(True); v.addWidget(intro)
+        intro.setWordWrap(True); intro.setObjectName("intro"); v.addWidget(intro)
         v.addLayout(self._file_row(L("الملف:", "File:"), "scrub_file"))
-        self.scrub_btn = W.QPushButton(L("افحص ونظّف", "Check and clean")); self.scrub_btn.setMinimumHeight(36); self.scrub_btn.clicked.connect(self.start_scrub); v.addWidget(self.scrub_btn)
+        self.scrub_btn = W.QPushButton(L("افحص ونظّف", "Check and clean")); self.scrub_btn.setObjectName("primary"); self.scrub_btn.setMinimumHeight(42); self.scrub_btn.clicked.connect(self.start_scrub); v.addWidget(self.scrub_btn)
         self.bar2 = W.QProgressBar(); self.bar2.setRange(0, 100); v.addWidget(self.bar2)
-        self.status2 = W.QLabel(""); self.status2.setWordWrap(True); v.addWidget(self.status2)
-        self.result2 = W.QTextEdit(); self.result2.setReadOnly(True); v.addWidget(self.result2, 1)
+        self.status2 = W.QLabel(""); self.status2.setWordWrap(True); self.status2.setObjectName("status"); v.addWidget(self.status2)
+        self.result2 = W.QTextEdit(); self.result2.setObjectName("result"); self.result2.setReadOnly(True); v.addWidget(self.result2, 1)
         return w
 
     def _tab_about(self):
@@ -297,8 +389,8 @@ class Main(W.QMainWindow):
 
     def start_locate(self):
         p = self.loc_file.text().strip()
-        if not p or not Path(p).exists():
-            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً.", "Choose a valid file.")); return
+        if not self._valid_source(p):
+            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً أو الصق رابطاً.", "Choose a valid file or paste a link.")); return
         try:
             lat, lon = float(self.lat.text()), float(self.lon.text())
         except ValueError:
@@ -317,8 +409,8 @@ class Main(W.QMainWindow):
 
     def start_scrub(self):
         p = self.scrub_file.text().strip()
-        if not p or not Path(p).exists():
-            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً.", "Choose a valid file.")); return
+        if not self._valid_source(p):
+            W.QMessageBox.warning(self, "Ayna", L("اختر ملفاً صالحاً أو الصق رابطاً.", "Choose a valid file or paste a link.")); return
         self.result2.clear()
         self._launch({"kind": "scrub", "path": p}, self.bar2, self.status2, self._scrub_done)
 
@@ -327,8 +419,8 @@ class Main(W.QMainWindow):
         self.worker = Worker(job); self.thread = threading.Thread(target=self.worker.run, daemon=True)
         self.worker.progress.connect(lambda p, m: (bar.setValue(p), status.setText(m)))
         self.worker.done.connect(lambda r: (bar.setValue(100), self._busy(False), on_done(r)))
-        self.worker.failed.connect(lambda tb: (self._busy(False), status.setText(L("فشل.", "Failed.")),
-                                               W.QMessageBox.critical(self, "Ayna", tb[-1500:])))
+        self.worker.failed.connect(lambda msg: (self._busy(False), status.setText(L("لم يكتمل.", "Not completed.")),
+                                                W.QMessageBox.information(self, "Ayna", msg)))
         self.thread.start()
 
     def _locate_done(self, r: dict):
