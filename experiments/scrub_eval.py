@@ -21,7 +21,7 @@ from overpass import detect as D
 from overpass import scrub as SC
 from overpass.benchmark import load_manifest
 
-DEFENCES = ["none", "highpass", "masker", "codec", "notch", "fill"]
+DEFENCES = ["none", "highpass", "masker", "codec", "notch", "flank", "fill"]
 
 
 def apply(name, x, sr, tracks):
@@ -30,6 +30,7 @@ def apply(name, x, sr, tracks):
     if name == "masker": return SC.add_masker(x, sr)
     if name == "codec": return SC.codec_roundtrip(x, sr)
     if name == "notch": return SC.scrub(x, sr, tracks, mode="notch")
+    if name == "flank": return SC.scrub(x, sr, tracks, mode="flank")
     if name == "fill": return SC.scrub(x, sr, tracks, mode="fill")
     raise ValueError(name)
 
@@ -58,6 +59,7 @@ def main():
         if not evs:
             continue
         x, sr = load_audio(row.path, sr=16000)
+        x_raw = x.copy()
         if speech is not None:
             rep = int(np.ceil(len(x) / len(speech))); mix = np.tile(speech, rep)[:len(x)]
             x = (x + 0.5 * mix / (np.abs(mix).max() + 1e-6) * (np.abs(x).max() + 1e-6)).astype(np.float32)
@@ -74,6 +76,8 @@ def main():
                              "contrast_before_db": b, "contrast_after_db": af, "status": "ok", **q})
             if name == "fill":
                 sf.write(Path(a.work) / f"{row.clip_id}.scrubbed.wav", y, sr)
+                # speech-free copy for the paper figure (same tracks, no mixed-in speech)
+                sf.write(Path(a.work) / f"{row.clip_id}.scrubbed_nospeech.wav", SC.scrub(x_raw, sr, tracks, mode="fill"), sr)
             pd.DataFrame(rows).to_csv(a.out, index=False)
             print(f"{row.clip_id} {name}: " + ", ".join(f"{r['contrast_before_db']:.1f}->{r['contrast_after_db']:.1f}" for r in rows if r.get('clip_id') == row.clip_id and r.get('defence') == name and r.get('status') == 'ok'))
     pd.DataFrame(rows).to_csv(a.out, index=False)

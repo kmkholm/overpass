@@ -48,32 +48,59 @@ def track_from_event(sp: Spectrogram, ev: EventFit, harmonics: int = 3, band_hz:
 
 def scrub(x: np.ndarray, sr: int, tracks: list[TonalTrack], half_width_hz: float = 2.5,
           nperseg: int = 4096, hop: int = 512, mode: str = "fill", atten_db: float = 40.0,
-          seed: int = 0) -> np.ndarray:
-    """Return the scrubbed waveform (same length as x)."""
+          seed: int = 0, fill_window_s: float = 60.0) -> np.ndarray:
+    """Return the scrubbed waveform (same length as x).
+
+    mode 'fill'  : each comb bin is replaced by the median magnitude of the *same* bin over the
+                   surrounding +-fill_window_s, taken only from frames in which the comb is not
+                   near that bin, with random phase; the per-bin level is preserved, so a whitened
+                   spectrogram shows neither a bright comb nor a dark trench.
+    mode 'flank' : the earlier variant, magnitude of the flanking bins at the same frame.
+    mode 'notch' : attenuation by atten_db (leaves a trench; ablation)."""
     rng = np.random.default_rng(seed)
     f, t, Z = ss.stft(x, sr, nperseg=nperseg, noverlap=nperseg - hop, window="hann", boundary="zeros", padded=True)
-    Z = Z.copy()
-    df = f[1] - f[0]
+    Z = Z.copy(); A = np.abs(Z)
+    df = f[1] - f[0]; dt = t[1] - t[0]
     wb = max(1, int(round(half_width_hz / df)))
     g = 10 ** (-atten_db / 20)
+    W = int(round(fill_window_s / dt))
+    # comb occupancy: for every frame the bins occupied by any harmonic of any track (with margin)
+    occ = np.zeros(Z.shape, bool)
+    spans = []       # (frame k, lo, hi) to replace
     for tr in tracks:
         fi = np.interp(t, tr.t, tr.f, left=np.nan, right=np.nan)
         for k in np.flatnonzero(np.isfinite(fi)):
             for h in range(1, tr.harmonics + 1):
                 b = int(round(h * fi[k] / df))
                 lo, hi = max(b - wb, 1), min(b + wb + 1, len(f) - 1)
-                if hi <= lo:
-                    continue
-                if mode == "notch":
-                    Z[lo:hi, k] *= g
-                else:
-                    # magnitude of the flanking bins (same width each side), random phase
-                    fl = np.abs(Z[max(lo - wb, 1):lo, k]); fr = np.abs(Z[hi:min(hi + wb, len(f)), k])
-                    mag = np.concatenate([fl, fr]).mean() if (len(fl) + len(fr)) else 0.0
-                    ph = rng.uniform(0, 2 * np.pi, hi - lo)
-                    Z[lo:hi, k] = mag * np.exp(1j * ph) * (1 + 0.2 * rng.standard_normal(hi - lo))
+                if hi > lo:
+                    spans.append((k, lo, hi)); occ[max(lo - 2 * wb, 0):min(hi + 2 * wb, len(f)), k] = True
+    # The filler must be a *consistent* STFT (one real noise signal masked and scaled), not independent
+    # random phases per frame: with 7/8 overlap, independent phases cancel in the overlap-add and leave a
+    # trench 8-10 dB deep. So the comb bins are zeroed, and a white-noise signal's STFT, masked to the same
+    # bins and scaled to the target magnitude, is added back.
+    noise = rng.standard_normal(len(x)).astype(np.float32)
+    _, _, N = ss.stft(noise, sr, nperseg=nperseg, noverlap=nperseg - hop, window="hann", boundary="zeros", padded=True)
+    n_ref = float(np.median(np.abs(N)))
+    G = np.zeros(Z.shape, np.float32)
+    for k, lo, hi in spans:
+        if mode == "notch":
+            Z[lo:hi, k] *= g; continue
+        if mode == "flank":
+            fl = A[max(lo - wb, 1):lo, k]; fr = A[hi:min(hi + wb, len(f)), k]
+            mag = np.full(hi - lo, np.concatenate([fl, fr]).mean() if (len(fl) + len(fr)) else 0.0)
+        else:
+            k0, k1 = max(k - W, 0), min(k + W + 1, Z.shape[1])
+            blk = A[lo:hi, k0:k1]; free = ~occ[lo:hi, k0:k1]
+            mag = np.array([np.median(row[m]) if m.sum() >= 8 else np.median(row) for row, m in zip(blk, free)])
+        Z[lo:hi, k] = 0.0
+        G[lo:hi, k] = mag / n_ref
+    if mode != "notch":
+        _, fill = ss.istft(N * G, sr, nperseg=nperseg, noverlap=nperseg - hop, window="hann", input_onesided=True, boundary=True)
+    else:
+        fill = np.zeros(len(x))
     _, y = ss.istft(Z, sr, nperseg=nperseg, noverlap=nperseg - hop, window="hann", input_onesided=True, boundary=True)
-    y = y[:len(x)]
+    y = y[:len(x)] + fill[:len(x)][:len(y[:len(x)])]
     if len(y) < len(x):
         y = np.pad(y, (0, len(x) - len(y)))
     return y.astype(np.float32)

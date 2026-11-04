@@ -78,7 +78,8 @@ def fig_scoremap(work, clip, cfg, lat, lon, q, spacing, out):
 def fig_scrub(work, clip, out):
     from dopplertrack.audio import load_audio, compute_spectrogram
     import soundfile as sf
-    y, sr = sf.read(Path(work) / f"{clip}.scrubbed.wav", dtype="float32")
+    p = Path(work) / f"{clip}.scrubbed_nospeech.wav"
+    y, sr = sf.read(p if p.exists() else Path(work) / f"{clip}.scrubbed.wav", dtype="float32")
     man = pd.read_csv(Path(work).parent / "data" / "manifest.csv").set_index("clip_id")
     x, _ = load_audio(man.loc[clip].path, sr=sr)
     det = json.load(open(Path(work) / f"{clip}.det.json"))[0]["fit"]
@@ -96,10 +97,10 @@ def fig_scrub(work, clip, out):
 def fig_scrub_bars(scrub, out):
     s = scrub[scrub.status == "ok"]
     fig, ax = plt.subplots(figsize=(3.6, 2.4))
-    order = ["none", "highpass", "masker", "codec", "notch", "fill"]
+    order = ["none", "highpass", "masker", "codec", "notch", "flank", "fill"]
     g = s.groupby("defence").contrast_after_db.agg(["mean", "std"]).reindex(order)
-    ax.bar(range(len(g)), g["mean"], yerr=g["std"], color=[PAL["raw"]] * 4 + [PAL["two"], PAL["full"]], capsize=2)
-    ax.set_xticks(range(len(g))); ax.set_xticklabels(["none", "high-pass", "masker", "codec", "notch", "fill (ours)"], rotation=20)
+    ax.bar(range(len(g)), g["mean"], yerr=g["std"], color=[PAL["raw"]] * 4 + [PAL["two"], PAL["nodem"], PAL["full"]], capsize=2)
+    ax.set_xticks(range(len(g))); ax.set_xticklabels(["none", "high-pass", "masker", "codec", "notch", "flank fill", "fill (ours)"], rotation=20)
     ax.set_ylabel("attacker's curve contrast at truth (dB)"); ax.axhline(0, color="#999999", lw=0.8, ls=":")
     fig.tight_layout(); fig.savefig(out / "fig_scrub_bars.pdf"); fig.savefig(out / "fig_scrub_bars.png", dpi=300); plt.close(fig)
 
