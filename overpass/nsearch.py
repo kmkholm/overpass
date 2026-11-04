@@ -104,11 +104,26 @@ def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], gr
         if cpa_cache:
             save_cpa_table(cpa_cache, cpa, fp)
     log(f"{len(cpa)} (point, flight) CPA records")
-    offsets = [e.t_cpa - events[0].t_cpa for e in events[1:]]
-    cands = chain_candidates(cpa, offsets, tol_s=tol_s,
-                             v_ranges=[(e.v * (1 - v_tol), e.v * (1 + v_tol)) for e in events],
-                             d_ranges=[(e.d * d_tol[0], e.d * d_tol[1]) for e in events], silence_d_m=silence_d_m)
-    log(f"{len(cands)} candidate (point, flight_1..{N}) tuples after offset + silence filters")
+    def _ranges(evs):
+        # speed: relative tolerance; slant distance: relative tolerance with an absolute floor, because
+        # the ideal-curve fit of a close pass (a few hundred metres) is far less certain than the fit of a distant one
+        vr = [(e.v * (1 - v_tol), e.v * (1 + v_tol)) for e in evs]
+        dr = [(max(100.0, min(e.d * d_tol[0], e.d - 2000.0)), max(e.d * d_tol[1], e.d + 3000.0)) for e in evs]
+        return vr, dr
+
+    while True:
+        offsets = [e.t_cpa - events[0].t_cpa for e in events[1:]]
+        vr, dr = _ranges(events)
+        cands = chain_candidates(cpa, offsets, tol_s=tol_s, v_ranges=vr, d_ranges=dr, silence_d_m=silence_d_m)
+        log(f"{len(cands)} candidate (point, flight_1..{len(events)}) tuples after offset + silence filters")
+        if len(cands) or len(events) <= 2:
+            break
+        # back off: a chain that no grid point can satisfy contains a false event; drop the weakest fit
+        weakest = min(range(len(events)), key=lambda i: events[i].score)
+        log(f"no candidate for {len(events)} events; dropping the weakest event (t_cpa {events[weakest].t_cpa:.0f} s, score {events[weakest].score:.2f})")
+        events = [e for i, e in enumerate(events) if i != weakest]
+        harmonics = [h for i, h in enumerate(harmonics) if i != weakest]
+    N = len(events)
     if max_candidates and len(cands) > max_candidates:
         log(f"capping at {max_candidates} candidates (closest CPA-time agreement first)")
         err = sum(((cands[f"t_heard{k}"] - cands.t_heard1 - offsets[k - 2]).abs() for k in range(2, N + 1)))

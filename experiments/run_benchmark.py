@@ -76,7 +76,7 @@ def main():
                     else:
                         evs = detect_events(sp, 60, 260, top=8); json.dump([e.to_dict() for e in evs], open(scan_path, "w"), indent=1)
                 else:
-                    evs = [d.fit for d in dets if d.fit is not None]
+                    evs = [d.fit for d in dets if d.fit is not None and D.plausible(d.fit)]
                 # seed = which detections are used when more than n_events are available: seed 0 = strongest;
                 # other seeds drop one of the top n+1 (robustness of the result to the event choice)
                 rng = np.random.default_rng(seed)

@@ -7,13 +7,14 @@ export PYTHONPATH="D:/Drive D/Ajloun Papers/systmatic review/dopplertrack/src;D:
 export PYTHONIOENCODING=utf-8
 mkdir -p results/ref app/models
 python experiments/export_onnx.py --model models/ridgenet.pt --out app/models/ridgenet.onnx 2>&1 | tail -2
-python -m overpass.cli detect work/ref_oysterbay.spec.npz --model models/ridgenet.pt --out work/ref_oysterbay.det.json --top 12 2>&1 | tail -16
+[ -f work/ref_oysterbay.det.json ] || python -m overpass.cli detect work/ref_oysterbay.spec.npz --model models/ridgenet.pt --out work/ref_oysterbay.det.json --top 12 2>&1 | tail -16
 for cfg in full raw two; do
   case $cfg in
     full) extra="--top-events 3";;
     raw)  extra="--top-events 3 --raw";;
     two)  extra="--top-events 2";;
   esac
+  if [ -s results/ref/search_$cfg.csv ] && [ "$(wc -l < results/ref/search_$cfg.csv)" -gt 2 ]; then echo "=== $cfg cached"; continue; fi
   echo "=== $cfg $(date +%H:%M)"
   python -m overpass.cli search work/ref_oysterbay.spec.npz --traces work/ref_oysterbay.traces.npz \
       --detections work/ref_oysterbay.det.json $extra --bbox 40.4 41.3 -74.4 -72.63 --spacing 200 \

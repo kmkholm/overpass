@@ -20,7 +20,7 @@ def _events_from(args, sp):
     if args.events:
         return [EventFit(**json.load(open(p))) for p in args.events]
     dets = D.load_detections(args.detections)
-    evs = [d.fit for d in dets if d.fit is not None]
+    evs = [d.fit for d in dets if d.fit is not None and D.plausible(d.fit)]
     if args.top_events:
         evs = evs[:args.top_events]
     return sorted(evs, key=lambda e: e.t_cpa)

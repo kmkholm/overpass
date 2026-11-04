@@ -240,7 +240,10 @@ def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, ref
                 fc = 0.5 * (flo + fhi)
                 band_lo = max(min(flo * 0.9, fc / 1.3), sp.f[0] + 1)
                 band_hi = min(max(fhi * 1.1, fc * 1.3), sp.f[-1] - 1)
-                d.fit = fit_event(sp, max(t0 - 20, sp.t[0]), min(t1 + 20, sp.t[-1]), band_lo, band_hi, c=c, harmonics=harm,
+                # fit over +-120 s around the component centre: the ridge map often captures only the steep
+                # middle of the S-curve, and the speed is set by the asymptotes on both sides
+                tc = 0.5 * (t0 + t1)
+                d.fit = fit_event(sp, max(tc - 120, sp.t[0]), min(tc + 120, sp.t[-1]), band_lo, band_hi, c=c, harmonics=harm,
                                   v_bounds=(25.0, 220.0), d_bounds=(150.0, 20000.0))
             except Exception as e:      # a degenerate component; keep the detection without a fit
                 if log: log(f"fit failed for {t0:.0f}-{t1:.0f}s: {e}")
@@ -251,6 +254,13 @@ def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, ref
     # unfitted detections fall back to the ridge probability
     dets.sort(key=lambda d: -(d.fit.score if d.fit is not None else d.prob))
     return dets[:top] if top else dets
+
+
+def plausible(fit: EventFit, v_min: float = 35.0, v_max: float = 200.0, d_max: float = 15000.0) -> bool:
+    """A fitted event is usable for the search only if it looks like an aircraft pass: ground
+    speed inside the propeller-aircraft range and a slant distance inside audible range. Fits
+    pinned at the optimiser bounds (v at 25 m/s, d at 20 km) are slow sweeps or flat tones."""
+    return v_min <= fit.v <= v_max and 150.0 < fit.d < d_max
 
 
 def save_detections(dets: list[Detection], path):

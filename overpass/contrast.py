@@ -59,13 +59,17 @@ class ContrastWindow(EventWindow):
         return total / self.harmonics
 
     def z_scores(self, t_audio, ratio, shifts, f0_scales, offsets=NULL_OFFSETS):
-        """(z (S,K), raw (S,K)): raw sweep scores and their z-score against the same curve
-        placed at `offsets` seconds away (null distribution of clutter under this curve shape)."""
-        shifts = np.asarray(shifts, float)
+        """(z (S,K), raw (S,K)): raw sweep scores, and the z-score of the best (shift, f0) cell
+        against the same curve placed at `offsets` seconds away (null distribution of clutter
+        under this curve shape). The null is evaluated only at the best cell, which keeps the
+        cost at one full sweep plus len(offsets) single-curve samples; other cells get -inf."""
+        shifts = np.asarray(shifts, float); f0_scales = np.asarray(f0_scales, float)
         raw = self.sweep_scores(t_audio, ratio, shifts, f0_scales)
-        null = np.stack([self.sweep_scores(t_audio, ratio, shifts + o, f0_scales) for o in offsets])   # (O, S, K)
-        mu = null.mean(0); sd = null.std(0) + 1e-3
-        return (raw - mu) / sd, raw
+        i, j = np.unravel_index(np.argmax(raw), raw.shape)
+        null = np.array([self.sweep_scores(t_audio, ratio, [shifts[i] + o], [f0_scales[j]])[0, 0] for o in offsets])
+        z = np.full(raw.shape, -np.inf)
+        z[i, j] = (raw[i, j] - null.mean()) / (null.std() + 1e-3)
+        return z, raw
 
 
 def contrast_locked_score(wins: list[ContrastWindow], segs: list[Segment], obs_enu, t_heard1: float,
