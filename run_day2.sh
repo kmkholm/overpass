@@ -12,8 +12,10 @@ until grep -q "ALL DONE" logs/night.log 2>/dev/null; do sleep 300; done
 until grep -q "collect exit" logs/collect_eu_day.log 2>/dev/null && grep -q "collect exit" logs/collect_us_day.log 2>/dev/null; do sleep 300; done
 log "clips now: $(python -c "import pandas as pd;m=pd.read_csv('data/manifest.csv');print(len(m), m.groupby(['region','split']).size().to_dict())")"
 
+TODAY=$(date -u +%F)
 for d in $(python -c "import pandas as pd;print(' '.join(sorted(set(pd.read_csv('data/manifest.csv').date))))"); do
   [ -f "work/.adsb_$d" ] && continue
+  [[ "$d" > "$TODAY" || "$d" == "$TODAY" ]] && { log "skipping $d (archive not due yet)"; continue; }
   until curl -s -o /dev/null -w "%{http_code}" "https://api.github.com/repos/adsblol/globe_history_2026/releases/tags/v$(echo $d | tr - .)-planes-readsb-prod-0" | grep -q 200; do
     log "ADS-B $d not published yet"; sleep 1800
   done
