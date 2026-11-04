@@ -73,11 +73,18 @@ def main():
     print(f"{len(streams)} streams; resolving ...")
     with ThreadPoolExecutor(a.parallel) as ex:
         resolved = list(ex.map(lambda s: resolve(s["url"]), streams))
-    live = [(s, r) for s, r in zip(streams, resolved) if r]
-    print(f"{len(live)} live streams with an audio-only format", flush=True)
+    # a search can land on a multi-camera compilation or a stream with a music bed; neither is one place with ambient sound
+    BAD = ("top live cams", "live cams from", "compilation", "music", "relax", "rolling cam", "best of", "mix ", "lofi", "radio")
+    def usable(r):
+        t = _ascii(r.get("title", "")).lower()
+        return not any(b in t for b in BAD)
+    live = [(s, r) for s, r in zip(streams, resolved) if r and usable(r)]
+    print(f"{len(live)} live streams with an audio-only format and a single-place title", flush=True)
     for s, r in zip(streams, resolved):
         if not r:
             print(f"  skip {s['stream_id']}: offline or no audio-only format", flush=True)
+        elif not usable(r):
+            print(f"  skip {s['stream_id']}: compilation/music stream ({_ascii(r.get('title', ''))[:50]})", flush=True)
     secs = a.minutes * 60
 
     def job(item):
