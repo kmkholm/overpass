@@ -39,7 +39,7 @@ class ContrastWindow(EventWindow):
         v = self.sp.sample(T, F) - 0.5 * (self.sp.sample(T, F * (1 + CONTRAST_DF)) + self.sp.sample(T, F * (1 - CONTRAST_DF)))
         return v
 
-    def sweep_scores(self, t_audio, ratio, shifts, f0_scales, n: int = 160) -> np.ndarray:
+    def sweep_scores(self, t_audio, ratio, shifts, f0_scales, n: int = 120) -> np.ndarray:
         """Weighted mean contrast under the curve for every (shift, f0_scale): (S, K)."""
         tq = np.linspace(self.fit.t_start, self.fit.t_end, n)
         rel = tq[None, :] - np.asarray(shifts, float)[:, None]
@@ -86,7 +86,7 @@ class ContrastWindow(EventWindow):
 
 
 def extra_score(win: ContrastWindow, seg: Segment, obs_enu, t0_map: float, shift: float, c: float | None = None,
-                f0_scales=np.arange(0.95, 1.0501, 0.005), raw: bool = False) -> tuple[float, float]:
+                f0_scales=np.arange(0.95, 1.0501, 0.01), raw: bool = False) -> tuple[float, float]:
     """Score of one additional ("soft") event at the time shift already locked by the anchors.
     Returns (z, raw); z is what the search adds (clipped at zero by the caller)."""
     c = speed_of_sound() if c is None else c
@@ -99,8 +99,8 @@ def extra_score(win: ContrastWindow, seg: Segment, obs_enu, t0_map: float, shift
 
 
 def contrast_locked_score(wins: list[ContrastWindow], segs: list[Segment], obs_enu, t_heard1: float,
-                          c: float | None = None, shifts=np.arange(-14, 14.01, 0.5),
-                          f0_scales=np.arange(0.95, 1.0501, 0.005), raw: bool = False):
+                          c: float | None = None, shifts=np.arange(-14, 14.01, 1.0),
+                          f0_scales=np.arange(0.95, 1.0501, 0.01), raw: bool = False):
     """N-event locked score. wins[k] pairs with segs[k]. Returns (total_z, per_event_z, shift, per_event_raw)."""
     c = speed_of_sound() if c is None else c
     t0_map = wins[0].fit.t_cpa - t_heard1

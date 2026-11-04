@@ -49,10 +49,13 @@ for row in load_manifest("data/manifest.csv").itertuples():
 EOF
 grep -c FAILED logs/prepare.log; echo "4 spec done" > $STAGE
 
-# 5. benchmark (full x 3 seeds, ablations seed 0), resumable
+# 5. benchmark: 100 km box, full + three ablations on every clip, two further ablations on six calibration clips
 log "stage 5: benchmark"
 python experiments/run_benchmark.py --manifest data/manifest.csv --work work --model models/ridgenet.pt --out results/bench.csv \
-    --configs full raw two nosilence nodem scan --seeds 0 1 2 --no-fetch > logs/bench.log 2>&1 || log "benchmark returned $?"
+    --configs full raw two nosilence --seeds 0 --region-km 100 --no-fetch > logs/bench.log 2>&1 || log "benchmark returned $?"
+SUB=$(python -c "import pandas as pd;m=pd.read_csv('data/manifest.csv');print(' '.join(m[m.split=='calib'].clip_id.head(6)))")
+python experiments/run_benchmark.py --manifest data/manifest.csv --work work --model models/ridgenet.pt --out results/bench.csv \
+    --configs nodem scan --seeds 0 --region-km 100 --no-fetch --clips $SUB >> logs/bench.log 2>&1 || log "benchmark (subset) returned $?"
 tail -5 logs/bench.log; echo "5 bench done" > $STAGE
 
 # 6. conformal
