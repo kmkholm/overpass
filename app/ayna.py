@@ -29,7 +29,8 @@ os.environ.setdefault("DOPPLERTRACK_CACHE", str(CACHE / "cache"))
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets as W
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1"
+RELIABLE_SCORE = 40.0        # identification-score gate; calibrated on the benchmark (see PROGRESS.md)
 DEVELOPER = "Dr. Mohammed Tawfik — kmkhol01@gmail.com"
 SETTINGS = CACHE / "settings.json"
 
@@ -216,7 +217,11 @@ class Worker(QtCore.QObject):
         q = j.get("q90", 1.0)
         from overpass.conformal import gap_set
         cells, area = gap_set(best, q, j.get("spacing", 200.0) if j["kind"] == "search" else 100.0)
-        return {"lat": float(top.lat), "lon": float(top.lon), "score": float(top.score), "n_events": len(events),
+        # reliability gate: on recordings with no real flyover the search still returns a best point, but its
+        # identification score stays far below that of a genuine match (benchmark: ~9-30 vs 54). Below the gate
+        # the answer is reported as "no reliable location" rather than as a pin.
+        reliable = float(top.score) >= RELIABLE_SCORE
+        return {"lat": float(top.lat), "lon": float(top.lon), "score": float(top.score), "n_events": len(events), "reliable": reliable,
                 "n_points": int(len(best)), "area_km2": float(area), "png": str(png), "pdf": str(pdf), "csv": str(csv_path),
                 "events": [(float(e.t_cpa), float(e.f0)) for e in events],
                 "claimed_rank": self._claimed_rank(best, j) if j["kind"] == "verify" else None}
@@ -427,7 +432,13 @@ class Main(W.QMainWindow):
 
     def _locate_done(self, r: dict):
         self._pdf = r["pdf"]; self._best = (r["lat"], r["lon"])
-        lines = [L(f"أفضل نقطة: {r['lat']:.5f}, {r['lon']:.5f} (درجة {r['score']:.2f})", f"Best point: {r['lat']:.5f}, {r['lon']:.5f} (score {r['score']:.2f})"),
+        lines = []
+        if not r.get("reliable", True):
+            lines.append(L(f"⚠ لا يوجد موقع موثوق: أعلى درجة تعرّف {r['score']:.1f} وهي أدنى من عتبة الموثوقية {RELIABLE_SCORE:.0f}. "
+                           "غالباً لم تمرّ طائرة مروحية حقيقية قريبة أثناء التسجيل أو أن الصوت ضعيف/مضغوط. النقطة أدناه للعرض فقط.",
+                           f"⚠ No reliable location: best identification score {r['score']:.1f} is below the reliability gate {RELIABLE_SCORE:.0f}. "
+                           "Most likely no real propeller aircraft passed nearby during the recording, or the audio is weak/compressed. The point below is shown for reference only."))
+        lines += [L(f"أفضل نقطة: {r['lat']:.5f}, {r['lon']:.5f} (درجة {r['score']:.2f})", f"Best point: {r['lat']:.5f}, {r['lon']:.5f} (score {r['score']:.2f})"),
                  L(f"عدد الطائرات المستخدمة: {r['n_events']} — نقاط الشبكة المقيّمة: {r['n_points']}", f"Aircraft events used: {r['n_events']} — grid points scored: {r['n_points']}"),
                  L(f"مساحة مجموعة الثقة (درجة ≥ الأفضل − 1): {r['area_km2']:.2f} كم²", f"Confidence set area (score ≥ best − 1): {r['area_km2']:.2f} km²")]
         if r.get("claimed_rank") is not None:
