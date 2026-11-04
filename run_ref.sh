@@ -29,7 +29,8 @@ for cfg in ["full", "raw", "two"]:
     except FileNotFoundError:
         print(cfg, "missing"); continue
     best = r.sort_values("score", ascending=False).drop_duplicates("gidx").reset_index(drop=True)
-    top = best.iloc[0]; err = haversine_m(top.lat, top.lon, 40.876466, -73.524951)
+    from overpass.nsearch import top_point
+    top = top_point(r); err = haversine_m(top.lat, top.lon, 40.876466, -73.524951)
     d = haversine_m(best.lat.to_numpy(), best.lon.to_numpy(), 40.876466, -73.524951)
     near = best[d <= 150]; ts = float(near.score.max()) if len(near) else float("nan")
     rank = int((best.score > ts).sum() + 1) if len(near) else -1

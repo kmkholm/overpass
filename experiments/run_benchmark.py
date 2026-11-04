@@ -100,7 +100,7 @@ def main():
                     rec.update({"status": "no_candidates"}); rows.append(rec); continue
                 best = NS.best_per_point(res)
                 res.to_csv(Path(a.work) / f"{row.clip_id}.{cfg}.s{seed}.res.csv", index=False)
-                top = best.iloc[0]
+                top = NS.top_point(res)          # best tuple, then best localisation cell within it
                 err = float(haversine_m(top.lat, top.lon, row.lat, row.lon))
                 d_all = haversine_m(best.lat.to_numpy(), best.lon.to_numpy(), row.lat, row.lon)
                 true_mask = d_all <= a.spacing * 0.75

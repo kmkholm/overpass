@@ -81,9 +81,12 @@ def main(argv=None):
         res["lat0"] = res.attrs.get("lat0", np.nan); res["lon0"] = res.attrs.get("lon0", np.nan)
         res.to_csv(a.out, index=False)
         print(res.head(20).to_string())
-        if a.cmd == "search" and a.refine and len(res):
+        tp = NS.top_point(res)
+        if tp is not None:
+            print(f"top point (best tuple, best localisation cell): {tp.lat:.6f}, {tp.lon:.6f}  score {tp.score:.2f}  score_loc {tp.score_loc:.3f}")
+        if a.cmd == "search" and a.refine and tp is not None:
             used = res.attrs.get("events", events); used_h = res.attrs.get("harmonics", harmonics)
-            fine = NS.refine_n(sp, used, segs, res.iloc[0], res.attrs["lat0"], res.attrs["lon0"], elevation=elev, harmonics=used_h, raw_score=a.raw)
+            fine = NS.refine_n(sp, used, segs, tp, res.attrs["lat0"], res.attrs["lon0"], elevation=elev, harmonics=used_h, raw_score=a.raw)
             fine.to_csv(a.out.replace(".csv", "_refined.csv"), index=False)
             print(fine.head(5).to_string())
     elif a.cmd == "scrub":

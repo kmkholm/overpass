@@ -172,6 +172,9 @@ def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], gr
                             f"d{j}": float(rs[f"xd{k}"]), f"v{j}": float(rs[f"xv{k}"])})
             else:
                 rec.update({f"seg{j}": -1, f"icao{j}": "", f"z{j}": 0.0, f"raw{j}": 0.0, f"t_heard{j}": np.nan, f"d{j}": np.nan, f"v{j}": np.nan})
+        # identification score (sum of z, dominated by the strongest event) ranks flight tuples;
+        # localisation score (sum of log(1+z)) balances the events and is used only *within* the winning tuple
+        rec["score_loc"] = float(sum(np.log1p(max(rec[f"z{k}"], 0.0)) for k in range(1, nx + 3)))
         out.append(rec)
         if progress and (i + 1) % 500 == 0:
             log(f"scored {i + 1}/{len(cands)} ({(time.time() - t0) / (i + 1) * 1000:.0f} ms each)")
@@ -206,9 +209,11 @@ def refine_n(sp: Spectrogram, events: list[EventFit], segs: list[Segment], row, 
         t0_map = events[0].t_cpa - float(t_heard1)
         zx = [extra_score(w, s, obs, t0_map, sh, c=c, raw=raw_score)[0] for w, s in extras]
         tot += sum(max(z, 0.0) for z in zx)
-        rows.append((g.lat[i], g.lon[i], tot, sh, *zs, *zx))
-    cols = ["lat", "lon", "score", "shift", "z1", "z2"] + [f"z{k + 3}" for k in range(len(extras))]
-    return pd.DataFrame(rows, columns=cols).sort_values("score", ascending=False).reset_index(drop=True)
+        loc = float(sum(np.log1p(max(z, 0.0)) for z in list(zs) + zx))
+        rows.append((g.lat[i], g.lon[i], tot, loc, sh, *zs, *zx))
+    cols = ["lat", "lon", "score", "score_loc", "shift", "z1", "z2"] + [f"z{k + 3}" for k in range(len(extras))]
+    # the tuple is fixed inside the refinement box, so the localisation score orders the cells
+    return pd.DataFrame(rows, columns=cols).sort_values("score_loc", ascending=False).reset_index(drop=True)
 
 
 def verify(sp: Spectrogram, events: list[EventFit], traces: list[Trace], lat: float, lon: float,
@@ -234,3 +239,15 @@ def search(sp: Spectrogram, events: list[EventFit], traces: list[Trace], bbox, e
 
 def best_per_point(res: pd.DataFrame) -> pd.DataFrame:
     return res.sort_values("score", ascending=False).drop_duplicates("gidx").reset_index(drop=True)
+
+
+def top_point(res: pd.DataFrame):
+    """Two-stage answer: the flight tuple with the highest identification score, then the cell of
+    that tuple with the highest localisation score. Returns the row (Series) or None."""
+    if len(res) == 0:
+        return None
+    ic = [c for c in res.columns if c.startswith("icao")]
+    top = res.iloc[0]
+    same = res[(res[ic].fillna("") == top[ic].fillna("")).all(axis=1)]
+    key = "score_loc" if "score_loc" in same.columns else "score"
+    return same.sort_values(key, ascending=False).iloc[0]

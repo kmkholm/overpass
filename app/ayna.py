@@ -129,6 +129,8 @@ class Worker(QtCore.QObject):
             raise RuntimeError(L("لا يوجد مرشّح يطابق تسلسل الطائرات المسموعة في هذه المنطقة.",
                                  "No candidate in this region matches the sequence of audible aircraft."))
         best = NS.best_per_point(res)
+        tp = NS.top_point(res)
+        best = pd.concat([pd.DataFrame([tp]), best[best.gidx != tp.gidx]], ignore_index=True)   # the two-stage answer first
         self.progress.emit(90, L("إعداد الخريطة والتقرير…", "Preparing the map and the report…"))
         out_dir = CACHE / "reports"; out_dir.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
