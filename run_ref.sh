@@ -32,8 +32,9 @@ for cfg in ["full", "raw", "two"]:
     top = best.iloc[0]; err = haversine_m(top.lat, top.lon, 40.876466, -73.524951)
     d = haversine_m(best.lat.to_numpy(), best.lon.to_numpy(), 40.876466, -73.524951)
     near = best[d <= 150]; ts = float(near.score.max()) if len(near) else float("nan")
-    rank = int((best.score > ts).sum() + 1)
-    print(f"{cfg}: top error {err:.0f} m, rank of truth {rank}, top score {top.score:.2f}, truth score {ts:.2f}, candidates {len(r)}, points {len(best)}")
+    rank = int((best.score > ts).sum() + 1) if len(near) else -1
+    ic = [c for c in r.columns if c.startswith("icao")]
+    print(f"{cfg}: top error {err:.0f} m, rank of truth {rank if rank > 0 else 'none'}, top score {top.score:.2f}, truth score {ts:.2f}, candidates {len(r)}, points {len(best)}, top tuple {[r.iloc[0][c] for c in ic]}")
     try:
         f = pd.read_csv(f"results/ref/search_{cfg}_refined.csv"); ft = f.iloc[0]
         print(f"   refined: {haversine_m(ft.lat, ft.lon, 40.876466, -73.524951):.0f} m")

@@ -243,8 +243,10 @@ def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, ref
                 # fit over +-120 s around the component centre: the ridge map often captures only the steep
                 # middle of the S-curve, and the speed is set by the asymptotes on both sides
                 tc = 0.5 * (t0 + t1)
+                # seed the fit from the component itself (centre time, centre frequency): the grid search then
+                # covers only +-30 s and +-12 Hz around it, which is ~50x cheaper than the blind grid
                 d.fit = fit_event(sp, max(tc - 120, sp.t[0]), min(tc + 120, sp.t[-1]), band_lo, band_hi, c=c, harmonics=harm,
-                                  v_bounds=(25.0, 220.0), d_bounds=(150.0, 20000.0))
+                                  init=(fc, 80.0, 2000.0, tc - 6.0), v_bounds=(25.0, 220.0), d_bounds=(150.0, 20000.0))
             except Exception as e:      # a degenerate component; keep the detection without a fit
                 if log: log(f"fit failed for {t0:.0f}-{t1:.0f}s: {e}")
         if refine and d.fit is not None and d.fit.score < min_fit_score:
@@ -253,10 +255,17 @@ def detect(model, sp: Spectrogram, thr: float = 0.5, c: float | None = None, ref
     # rank by the contrast of the fitted ideal curve (a real flyover is bright *and* Doppler-shaped);
     # unfitted detections fall back to the ridge probability
     dets.sort(key=lambda d: -(d.fit.score if d.fit is not None else d.prob))
+    # one detection per flyover: a harmonic that escaped group_harmonics fits the same heard CPA time
+    kept = []
+    for d in dets:
+        tc = d.fit.t_cpa if d.fit is not None else 0.5 * (d.t_start + d.t_end)
+        if all(abs(tc - (k.fit.t_cpa if k.fit is not None else 0.5 * (k.t_start + k.t_end))) > 30.0 for k in kept):
+            kept.append(d)
+    dets = kept
     return dets[:top] if top else dets
 
 
-def plausible(fit: EventFit, v_min: float = 35.0, v_max: float = 200.0, d_max: float = 15000.0) -> bool:
+def plausible(fit: EventFit, v_min: float = 30.0, v_max: float = 200.0, d_max: float = 15000.0) -> bool:
     """A fitted event is usable for the search only if it looks like an aircraft pass: ground
     speed inside the propeller-aircraft range and a slant distance inside audible range. Fits
     pinned at the optimiser bounds (v at 25 m/s, d at 20 km) are slow sweeps or flat tones."""

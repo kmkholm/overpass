@@ -58,17 +58,30 @@ class ContrastWindow(EventWindow):
         total[~valid] = 0.0
         return total / self.harmonics
 
+    @property
+    def sigma(self) -> float:
+        """Scale of the clutter contrast in this window: the standard deviation of the contrast
+        under the event's own fitted ideal curve when it is slid to NULL_OFFSETS (computed once
+        per window). A floor of 0.3 dB keeps a quiet window from inflating z-scores."""
+        if not hasattr(self, "_sigma"):
+            from dopplertrack.doppler import ideal_curve
+            tq = np.linspace(self.fit.t_start - 80, self.fit.t_end + 80, 640)
+            ratio = ideal_curve(tq, 1.0, self.fit.v, self.fit.d, self.fit.t_cpa_emit)
+            null = np.array([self.sweep_scores(tq, ratio, [o], [1.0])[0, 0] for o in NULL_OFFSETS])
+            self._sigma = float(max(null.std(), 0.3))
+        return self._sigma
+
     def z_scores(self, t_audio, ratio, shifts, f0_scales, offsets=NULL_OFFSETS):
-        """(z (S,K), raw (S,K)): raw sweep scores, and the z-score of the best (shift, f0) cell
-        against the same curve placed at `offsets` seconds away (null distribution of clutter
-        under this curve shape). The null is evaluated only at the best cell, which keeps the
-        cost at one full sweep plus len(offsets) single-curve samples; other cells get -inf."""
+        """(z (S,K), raw (S,K)): raw sweep scores, and for the best (shift, f0) cell the contrast
+        excess over the same curve placed at `offsets` seconds away, scaled by the window's clutter
+        sigma. Evaluating the null only at the best cell keeps the cost at one full sweep plus
+        len(offsets) single-curve samples; other cells get -inf."""
         shifts = np.asarray(shifts, float); f0_scales = np.asarray(f0_scales, float)
         raw = self.sweep_scores(t_audio, ratio, shifts, f0_scales)
         i, j = np.unravel_index(np.argmax(raw), raw.shape)
         null = np.array([self.sweep_scores(t_audio, ratio, [shifts[i] + o], [f0_scales[j]])[0, 0] for o in offsets])
         z = np.full(raw.shape, -np.inf)
-        z[i, j] = (raw[i, j] - null.mean()) / (null.std() + 1e-3)
+        z[i, j] = (raw[i, j] - null.mean()) / self.sigma
         return z, raw
 
 
