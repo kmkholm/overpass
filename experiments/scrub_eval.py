@@ -69,7 +69,12 @@ def main():
                 y = apply(name, x, sr, tracks)
             except Exception as e:
                 rows.append({"clip_id": row.clip_id, "defence": name, "status": f"error: {e}"}); continue
-            q = SC.speech_quality(x, y, sr) if speech is not None and name != "none" else {}
+            # PESQ is defined for utterance-length signals (it aborts on an hour of audio): score a 30 s excerpt
+            # centred on the first flyover, where the scrubber acts and the mixed-in speech is present
+            q = {}
+            if speech is not None and name != "none":
+                c0 = int(max(evs[0].t_cpa - 15, 0) * sr); c1 = min(c0 + 30 * sr, len(x))
+                q = SC.speech_quality(x[c0:c1], y[c0:c1], sr)
             for k, e in enumerate(evs):
                 b, af = SC.residual_contrast(x, y, sr, e)
                 rows.append({"clip_id": row.clip_id, "region": row.region, "defence": name, "event": k, "t_cpa": e.t_cpa,
