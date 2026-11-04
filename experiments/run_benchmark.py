@@ -46,6 +46,7 @@ def main():
     ap.add_argument("--spacing", type=float, default=200.0); ap.add_argument("--region-km", type=float, default=150.0)
     ap.add_argument("--archive-root"); ap.add_argument("--no-fetch", action="store_true")
     ap.add_argument("--clips", nargs="*", help="subset of clip_ids")
+    ap.add_argument("--max-cands", type=int, default=20000, help="cap on anchor candidates scored per search (closest offset agreement first)")
     a = ap.parse_args()
     man = load_manifest(a.manifest)
     if a.clips:
@@ -92,8 +93,8 @@ def main():
                 try:
                     res, segs = NS.search(sp, evs, traces, bbox, elevation=terrain.elevation if C["dem"] else None,
                                           spacing_m=a.spacing, max_region_km=a.region_km + 1, raw_score=C["raw"],
-                                          silence_d_m=6000.0 if C["silence"] else None,
-                                          cpa_cache=str(Path(a.work) / f"{row.clip_id}.cpa_{'dem' if C['dem'] else 'flat'}.npz"), progress=False)
+                                          silence_d_m=6000.0 if C["silence"] else None, max_candidates=a.max_cands,
+                                          cpa_cache=str(Path(a.work) / f"{row.clip_id}.cpa_{'dem' if C['dem'] else 'flat'}_{int(a.spacing)}m.npz"), progress=False)
                 except Exception as e:
                     rec.update({"status": f"error: {e}"}); rows.append(rec); continue
                 if len(res) == 0:
