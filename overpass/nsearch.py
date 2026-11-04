@@ -80,7 +80,7 @@ def _segments_for(traces, grid: Grid, max_range_m: float):
 
 
 def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], grid: Grid,
-                harmonics: list[int] | None = None, tol_s: float = 6.0, v_tol: float = 0.35, d_tol=(0.4, 2.5),
+                harmonics: list[int] | None = None, tol_s: float = 12.0, v_tol: float = 0.35, d_tol=(0.4, 2.5),
                 silence_d_m: float | None = 6000.0, max_range_m: float = 12000.0, c: float | None = None,
                 cpa_cache=None, raw_score: bool = False, max_candidates: int | None = 400000,
                 progress: bool = True) -> tuple[pd.DataFrame, list[Segment]]:
@@ -147,6 +147,7 @@ def run_nsearch(sp: Spectrogram, events: list[EventFit], traces: list[Trace], gr
     if len(res):
         res = res.sort_values("score", ascending=False).reset_index(drop=True)
     res.attrs["lat0"] = grid.lat0; res.attrs["lon0"] = grid.lon0
+    res.attrs["events"] = events; res.attrs["harmonics"] = harmonics     # the events actually used after back-off
     return res, segs
 
 

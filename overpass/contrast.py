@@ -86,7 +86,7 @@ class ContrastWindow(EventWindow):
 
 
 def contrast_locked_score(wins: list[ContrastWindow], segs: list[Segment], obs_enu, t_heard1: float,
-                          c: float | None = None, shifts=np.arange(-8, 8.01, 0.5),
+                          c: float | None = None, shifts=np.arange(-14, 14.01, 0.5),
                           f0_scales=np.arange(0.95, 1.0501, 0.005), raw: bool = False):
     """N-event locked score. wins[k] pairs with segs[k]. Returns (total_z, per_event_z, shift, per_event_raw)."""
     c = speed_of_sound() if c is None else c

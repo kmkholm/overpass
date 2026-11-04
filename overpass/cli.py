@@ -82,7 +82,8 @@ def main(argv=None):
         res.to_csv(a.out, index=False)
         print(res.head(20).to_string())
         if a.cmd == "search" and a.refine and len(res):
-            fine = NS.refine_n(sp, events, segs, res.iloc[0], res.attrs["lat0"], res.attrs["lon0"], elevation=elev, harmonics=harmonics, raw_score=a.raw)
+            used = res.attrs.get("events", events); used_h = res.attrs.get("harmonics", harmonics)
+            fine = NS.refine_n(sp, used, segs, res.iloc[0], res.attrs["lat0"], res.attrs["lon0"], elevation=elev, harmonics=used_h, raw_score=a.raw)
             fine.to_csv(a.out.replace(".csv", "_refined.csv"), index=False)
             print(fine.head(5).to_string())
     elif a.cmd == "scrub":
