@@ -30,6 +30,7 @@ def main():
     man = load_manifest(a.manifest).set_index("clip_id")
     bench = pd.read_csv(a.bench)
     bench = bench[(bench.config == a.config) & (bench.seed == a.seed) & (bench.status == "ok")]
+    bench = bench[bench.clip_id.isin(man.index)]  # clips excluded after the audit stay in bench.csv but not here
     if a.feasible:
         feas = pd.read_csv(a.feasible); ok = set(feas[feas.n_passes >= 2].clip_id)
         bench = bench[bench.clip_id.isin(ok)]

@@ -31,7 +31,10 @@ def main():
             continue
         boxes = {r.clip_id: bbox_around(float(r.lat), float(r.lon), a.region_km) for r in todo}
         # union box: a trace is kept while streaming if it touches any clip box
-        urls = release_asset_urls(date, a.pod)
+        try:
+            urls = release_asset_urls(date, a.pod)
+        except Exception as e:  # the daily release appears the next day; skip and retry on the next run
+            print(f"[{date}] archive not available yet ({e}); skipped", flush=True); continue
         stream = _ChainedHTTP(urls); t0 = time.time()
         kept = {k: [] for k in boxes}
         union = (min(b[0] for b in boxes.values()), max(b[1] for b in boxes.values()),

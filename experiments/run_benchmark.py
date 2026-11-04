@@ -57,7 +57,10 @@ def main():
     terrain = Terrain()
     rows = [] if done.empty else done.to_dict("records")
     for row in man.itertuples():
-        sp, traces, sp_path, tr_path = prepare_clip(row, Path(a.work), a.archive_root, fetch=not a.no_fetch)
+        try:
+            sp, traces, sp_path, tr_path = prepare_clip(row, Path(a.work), a.archive_root, fetch=not a.no_fetch)
+        except FileNotFoundError as e:
+            print(f"{row.clip_id}: skipped ({e})", flush=True); continue
         det_path = Path(a.work) / f"{row.clip_id}.det.json"
         if det_path.exists():
             dets = D.load_detections(det_path)

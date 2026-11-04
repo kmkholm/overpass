@@ -10,6 +10,8 @@ log() { echo "[$(date '+%m-%d %H:%M:%S')] $*"; }
 log "waiting for the night pipeline and both daytime sessions"
 until grep -q "ALL DONE" logs/night.log 2>/dev/null; do sleep 300; done
 until grep -q "collect exit" logs/collect_eu_day.log 2>/dev/null && grep -q "collect exit" logs/collect_us_day.log 2>/dev/null; do sleep 300; done
+until grep -q "collect exit" logs/collect_me_day.log 2>/dev/null; do sleep 300; done
+log "all sessions done"
 log "clips now: $(python -c "import pandas as pd;m=pd.read_csv('data/manifest.csv');print(len(m), m.groupby(['region','split']).size().to_dict())")"
 
 TODAY=$(date -u +%F)
