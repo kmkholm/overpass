@@ -16,3 +16,7 @@ app/*.spec
 app/bin/
 app/models/
 app/dist*/
+
+# data release is tracked even though results/ and models/ are ignored elsewhere
+!release/results/
+!release/results/**

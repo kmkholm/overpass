@@ -1,0 +1,46 @@
+{
+ "gap_a0.1_EU": {
+  "coverage": 0.0,
+  "median_area_km2": 16.32,
+  "n": 3
+ },
+ "gap_a0.1_all": {
+  "coverage": 0.0,
+  "median_area_km2": 16.32,
+  "n": 3,
+  "q": Infinity
+ },
+ "radius_a0.1_EU": {
+  "coverage": 1.0,
+  "median_area_km2": Infinity,
+  "n": 3
+ },
+ "radius_a0.1_all": {
+  "coverage": 1.0,
+  "median_area_km2": Infinity,
+  "n": 3,
+  "q": Infinity
+ },
+ "gap_a0.2_EU": {
+  "coverage": 0.0,
+  "median_area_km2": 16.32,
+  "n": 3
+ },
+ "gap_a0.2_all": {
+  "coverage": 0.0,
+  "median_area_km2": 16.32,
+  "n": 3,
+  "q": Infinity
+ },
+ "radius_a0.2_EU": {
+  "coverage": 1.0,
+  "median_area_km2": 10153.225185233627,
+  "n": 3
+ },
+ "radius_a0.2_all": {
+  "coverage": 1.0,
+  "median_area_km2": 10153.225185233627,
+  "n": 3,
+  "q": 56849.55543458641
+ }
+}

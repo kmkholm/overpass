@@ -1,0 +1,34 @@
+clip_id,region,split,duration_s,n_traces_day,n_passes,min_d_km,passes
+ref_oysterbay,US,calib,3599.024,1217.0,9.0,3.637521266937256,131s@7.3km 603s@11.8km 782s@8.4km 815s@8.8km 1118s@4.1km 1408s@8.2km 2156s@6.1km 2287s@9.3km 3079s@3.6km
+us_venice_beach,US,calib,1798.774,1655.0,12.0,1.0571017265319824,94s@7.3km 305s@6.2km 425s@1.3km 450s@3.3km 722s@1.1km 868s@1.4km 979s@1.1km 980s@1.1km 1376s@4.7km 1509s@2.4km 1542s@5.0km 1722s@6.4km
+us_times_square,US,calib,1798.774,1152.0,20.0,0.5657562017440796,20s@1.9km 51s@2.1km 242s@2.6km 319s@1.9km 332s@2.1km 338s@1.9km 441s@2.2km 614s@1.9km 867s@1.8km 1008s@1.4km 1023s@1.9km 1113s@1.8km 1150s@6.6km 1317s@7.8km 1435s@1.9km 1489s@1.9km 1525s@0.6km 1601s@1.9km 1637s@1.7km 1677s@6.6km
+us_cornell_feeder,US,calib,1798.774,169.0,0.0,,
+us_decorah_eagles,US,calib,1798.774,67.0,1.0,11.037043571472168,633s@11.0km
+us_waikiki,US,calib,1798.774,239.0,12.0,1.654320478439331,64s@5.4km 129s@1.7km 350s@2.4km 351s@9.5km 560s@2.1km 743s@2.0km 815s@2.9km 962s@3.1km 1326s@6.5km 1381s@9.9km 1645s@6.9km 1759s@3.5km
+us_portland_head,US,calib,1798.774,202.0,1.0,3.605196952819824,411s@3.6km
+us_duluth_canal,US,calib,1798.774,47.0,2.0,6.651756286621094,242s@10.6km 450s@6.7km
+us_mackinac,US,calib,1798.774,24.0,0.0,,
+us_cape_may,US,calib,1798.774,359.0,0.0,,
+us_new_orleans,US,calib,1798.774,231.0,0.0,,
+us_asheville,US,calib,1798.774,330.0,5.0,1.6372171640396118,72s@9.1km 662s@5.4km 858s@1.9km 1108s@11.3km 1700s@1.6km
+us_lake_placid,US,calib,1728.774,90.0,0.0,,
+eu_dublin,EU,test,1798.774,87.0,0.0,,
+eu_nyhavn,EU,test,1798.774,141.0,4.0,2.058720350265503,556s@2.1km 735s@7.6km 1206s@7.7km 1730s@4.9km
+eu_hamburg,EU,test,1798.774,169.0,1.0,11.225442886352539,753s@11.2km
+eu_dublin_d,EU,test,2698.774,70.0,2.0,2.358198881149292,804s@8.3km 1758s@2.4km
+eu_hamburg_d,EU,test,2113.774,223.0,3.0,5.210721015930176,624s@5.2km 912s@6.8km 935s@5.3km
+me_makkah,ME,test,1798.774,0.0,0.0,,
+me_madinah,ME,test,1798.774,0.0,0.0,,
+me_jerusalem,ME,test,1798.774,75.0,0.0,,
+us_jackson_hole_d,US,calib,2698.774,64.0,1.0,2.332902669906616,651s@2.3km
+us_venice_beach_d,US,calib,2698.774,1755.0,18.0,0.9061000347137451,272s@10.8km 467s@3.4km 490s@7.8km 811s@1.4km 822s@2.6km 840s@2.4km 863s@1.5km 929s@1.5km 1250s@1.3km 1364s@1.5km 1512s@1.6km 1558s@2.4km 1833s@2.1km 1846s@1.6km 2056s@1.4km 2433s@1.5km 2452s@2.1km 2545s@0.9km
+us_cornell_feeder_d,US,calib,2698.774,215.0,0.0,,
+us_decorah_eagles_d,US,calib,2698.774,92.0,0.0,,
+us_waikiki_d,US,calib,1403.774,270.0,8.0,3.243330478668213,453s@9.4km 539s@6.9km 679s@9.4km 714s@6.1km 1025s@3.2km 1135s@4.1km 1137s@9.9km 1331s@9.9km
+us_duluth_canal_d,US,calib,2698.774,46.0,1.0,10.545241355895996,126s@10.5km
+us_mackinac_d,US,calib,2698.774,27.0,0.0,,
+us_cape_may_d,US,calib,2698.774,386.0,3.0,7.623276233673096,399s@11.7km 884s@7.6km 2446s@7.8km
+us_new_orleans_d,US,calib,2698.774,261.0,7.0,3.6074681282043457,446s@4.0km 835s@3.6km 885s@7.9km 1834s@8.1km 1955s@10.7km 1959s@4.2km 2629s@8.9km
+me_makkah_d,ME,test,,,,,
+me_madinah_d,ME,test,,,,,
+me_jerusalem_d,ME,test,,,,,
