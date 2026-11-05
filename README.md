@@ -1,5 +1,9 @@
 # OVERPASS
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23983309.svg)](https://doi.org/10.5281/zenodo.23983309)
+
+Code and data are archived at Zenodo: https://doi.org/10.5281/zenodo.23983309 (data in `release/`, see `release/README.md`).
+
 Forensic verification of audio recording location from inaudible propeller-aircraft Doppler
 signatures and public ADS-B tracks, with conformal location sets and a Doppler-tone scrubber.
 
