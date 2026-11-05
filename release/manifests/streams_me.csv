@@ -1,0 +1,12 @@
+stream_id,url,lat,lon,region,place,split,truth_sigma_m
+me_makkah,ytsearch:Makkah live Masjid al Haram 24/7,21.42250,39.82620,ME,"Masjid al-Haram, Makkah SA",test,150
+me_madinah,ytsearch:Madinah live Masjid an Nabawi 24/7,24.46720,39.61110,ME,"Masjid an-Nabawi, Madinah SA",test,150
+me_dubai_marina,ytsearch:Dubai Marina live cam,25.07640,55.13900,ME,"Dubai Marina, Dubai AE",test,200
+me_dubai_downtown,ytsearch:Dubai Burj Khalifa fountain live cam,25.19500,55.27420,ME,"Dubai Fountain, Downtown Dubai AE",test,200
+me_abu_dhabi,ytsearch:Abu Dhabi Corniche live cam,24.47300,54.33600,ME,"Corniche, Abu Dhabi AE",test,300
+me_doha,ytsearch:Doha Corniche live cam Qatar,25.29600,51.53500,ME,"Corniche, Doha QA",test,300
+me_jerusalem,ytsearch:Western Wall live cam Jerusalem,31.77670,35.23450,ME,"Western Wall, Jerusalem",test,80
+me_aqaba,ytsearch:Aqaba live cam Jordan,29.52670,35.00600,ME,"Aqaba, JO",test,500
+me_cairo,ytsearch:Cairo live cam Nile,30.04440,31.23570,ME,"Nile, Cairo EG",test,500
+me_muscat,ytsearch:Muscat live cam Oman,23.58800,58.38300,ME,"Muscat, OM",test,500
+me_manama,ytsearch:Bahrain live cam Manama,26.22850,50.58600,ME,"Manama, BH",test,500

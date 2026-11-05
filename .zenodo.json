@@ -1,0 +1,42 @@
+{
+  "title": "OVERPASS: code and data for forensic verification of audio recording location from propeller-aircraft Doppler signatures and public ADS-B tracks",
+  "upload_type": "dataset",
+  "version": "1.0.0",
+  "creators": [
+    {
+      "name": "Tawfik, Mohammed",
+      "affiliation": "Ajloun National University, Department of Cyber Security",
+      "orcid": "0000-0002-1227-387X"
+    }
+  ],
+  "description": "<p>Code and data of the OVERPASS study, which locates or verifies the position of an outdoor audio recording by matching the Doppler sweeps of propeller aircraft heard in it against the public ADS-B flight tracks of the recording day, and which removes that signature with a track-and-fill scrubber.</p><p>The <code>release/</code> folder holds: the manifests of the 33 recordings of the study (one public reference recording and 32 webcam recordings from the United States, Europe and the Middle East, with camera positions and UTC capture times) and of the 28 recordings excluded by the stream-title audit; propeller-aircraft ADS-B extracts per clip and for the six days of the Livermore smartphone dataset; automatic flyover detections; the trained ridge-segmentation network; and every results table behind the paper (blind search with ablations, feasibility, audible-signal check, conformal location sets, scrubber evaluation, Middle East archive coverage, Livermore fit accuracy and known-time verification).</p><p>No audio is redistributed: the webcam streams belong to their operators. The Livermore recordings are available from their authors (doi:10.5281/zenodo.23424278).</p><p>Licences: code MIT; ADS-B extracts ODbL 1.0 (derived from adsb.lol); all other data CC BY 4.0.</p>",
+  "access_right": "open",
+  "license": "cc-by-4.0",
+  "keywords": [
+    "audio forensics",
+    "recording location",
+    "Doppler effect",
+    "ADS-B",
+    "propeller aircraft",
+    "conformal prediction",
+    "privacy",
+    "anti-forensics"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.23424278",
+      "relation": "references",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://github.com/adsblol/globe_history_2026",
+      "relation": "isDerivedFrom",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://github.com/mjshiggins/dopplertrack",
+      "relation": "references",
+      "resource_type": "software"
+    }
+  ]
+}

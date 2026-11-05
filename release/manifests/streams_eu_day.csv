@@ -1,0 +1,23 @@
+stream_id,url,lat,lon,region,place,split,truth_sigma_m
+eu_rialto_d,ytsearch:Rialto Bridge Venice live cam SkylineWebcams,45.43800,12.33590,EU,"Rialto Bridge, Venice IT",test,60
+eu_trevi_d,ytsearch:Trevi Fountain Rome live cam SkylineWebcams,41.90090,12.48330,EU,"Trevi Fountain, Rome IT",test,40
+eu_san_marco_d,ytsearch:Piazza San Marco Venice live cam,45.43410,12.33880,EU,"Piazza San Marco, Venice IT",test,80
+eu_thessaloniki_d,ytsearch:Thessaloniki Aristotelous Square live cam,40.63250,22.94070,EU,"Aristotelous Square, Thessaloniki GR",test,80
+eu_piran_d,ytsearch:Piran Tartini Square live cam,45.52830,13.56820,EU,"Tartini Square, Piran SI",test,60
+eu_naples_d,ytsearch:Naples Piazza Garibaldi live cam SkylineWebcams,40.85250,14.26980,EU,"Piazza Garibaldi, Naples IT",test,100
+eu_prague_d,ytsearch:Prague Old Town Square live cam,50.08750,14.42130,EU,"Old Town Square, Prague CZ",test,80
+eu_dublin_d,ytsearch:Dublin Temple Bar live cam EarthCam,53.34560,-6.26340,EU,"Temple Bar, Dublin IE",test,80
+eu_madrid_d,ytsearch:Puerta del Sol Madrid live cam,40.41690,-3.70350,EU,"Puerta del Sol, Madrid ES",test,80
+eu_amsterdam_d,ytsearch:Amsterdam Dam Square live cam,52.37310,4.89320,EU,"Dam Square, Amsterdam NL",test,80
+eu_scheveningen_d,ytsearch:Scheveningen beach live cam,52.11100,4.27900,EU,"Scheveningen Pier, NL",test,150
+eu_ljubljana_d,ytsearch:Ljubljana Preseren Square live cam,46.05140,14.50600,EU,"Preseren Square, Ljubljana SI",test,60
+eu_lisbon_d,ytsearch:Lisbon Praca do Comercio live cam,38.70750,-9.13640,EU,"Praca do Comercio, Lisbon PT",test,100
+eu_krakow_d,ytsearch:Krakow Main Market Square live cam,50.06170,19.93730,EU,"Main Market Square, Krakow PL",test,100
+eu_nyhavn_d,ytsearch:Copenhagen Nyhavn live cam,55.67970,12.59060,EU,"Nyhavn, Copenhagen DK",test,100
+eu_bruges_d,ytsearch:Bruges Markt live cam,51.20890,3.22460,EU,"Markt, Bruges BE",test,80
+eu_hamburg_d,ytsearch:Hamburg Landungsbruecken live cam,53.54600,9.97100,EU,"Landungsbruecken, Hamburg DE",test,150
+eu_palma_d,ytsearch:Palma de Mallorca live cam cathedral,39.56750,2.65000,EU,"Palma Cathedral, Mallorca ES",test,150
+eu_nerja_d,ytsearch:Nerja Balcon de Europa live cam,36.74370,-3.87400,EU,"Balcon de Europa, Nerja ES",test,60
+eu_innsbruck_d,ytsearch:Innsbruck live cam Goldenes Dachl,47.26850,11.39330,EU,"Goldenes Dachl, Innsbruck AT",test,80
+eu_santorini_d,ytsearch:Santorini Oia live cam,36.46180,25.37530,EU,"Oia, Santorini GR",test,200
+eu_zakopane_d,ytsearch:Zakopane Krupowki live cam,49.29300,19.96200,EU,"Krupowki, Zakopane PL",test,150

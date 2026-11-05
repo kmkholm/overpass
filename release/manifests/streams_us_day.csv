@@ -1,0 +1,31 @@
+stream_id,url,lat,lon,region,place,split,truth_sigma_m
+us_jackson_hole_d,ytsearch:Jackson Hole Town Square live cam SeeJH,43.47989,-110.76231,US,"Jackson Hole Town Square, WY",calib,40
+us_venice_beach_d,ytsearch:Venice Beach live cam 24/7,33.98505,-118.47250,US,"Venice Beach boardwalk, CA",calib,80
+us_key_west_d,ytsearch:Key West live cam Southernmost Point,24.54650,-81.79760,US,"Southernmost Point, Key West FL",calib,80
+us_times_square_d,ytsearch:EarthCam Times Square live 4K,40.75800,-73.98550,US,"Times Square, New York NY",calib,100
+us_cornell_feeder_d,ytsearch:Cornell Lab FeederWatch cam live Sapsucker Woods,42.48010,-76.45120,US,"Cornell Lab of Ornithology, Ithaca NY",calib,80
+us_decorah_eagles_d,ytsearch:Decorah Eagles live cam Raptor Resource Project,43.29390,-91.80520,US,"Decorah fish hatchery, IA",calib,200
+us_nantucket_d,ytsearch:Nantucket live cam Brant Point harbor,41.29000,-70.09030,US,"Brant Point, Nantucket MA",calib,100
+us_chatham_pier_d,ytsearch:Chatham Fish Pier live cam Cape Cod,41.68000,-69.94700,US,"Chatham Fish Pier, MA",calib,100
+us_boothbay_d,ytsearch:Boothbay Harbor live cam Maine,43.85200,-69.62800,US,"Boothbay Harbor, ME",calib,150
+us_myrtle_beach_d,ytsearch:Myrtle Beach boardwalk live cam,33.69000,-78.88400,US,"Myrtle Beach boardwalk, SC",calib,100
+us_gatlinburg_d,ytsearch:Gatlinburg live cam downtown,35.71200,-83.51600,US,"Gatlinburg, TN",calib,100
+us_estes_park_d,ytsearch:Estes Park live cam Elkhorn Avenue,40.37700,-105.52100,US,"Estes Park, CO",calib,100
+us_hilton_head_d,ytsearch:Hilton Head Coligny Beach live cam,32.13700,-80.73300,US,"Coligny Beach, Hilton Head SC",calib,150
+us_ocean_city_d,ytsearch:Ocean City Maryland boardwalk live cam,38.33600,-75.08400,US,"Ocean City boardwalk, MD",calib,150
+us_seaside_or_d,ytsearch:Seaside Oregon live cam promenade,45.99300,-123.92900,US,"Seaside, OR",calib,150
+us_waikiki_d,ytsearch:Waikiki Beach live cam,21.27700,-157.82900,US,"Waikiki Beach, Honolulu HI",calib,150
+us_portland_head_d,ytsearch:Portland Head Light live cam,43.62300,-70.20800,US,"Portland Head Light, ME",calib,80
+us_provincetown_d,ytsearch:Provincetown live cam MacMillan Pier,42.05100,-70.18300,US,"MacMillan Pier, Provincetown MA",calib,100
+us_duluth_canal_d,ytsearch:Duluth Canal Park harbor cam live,46.77900,-92.09300,US,"Canal Park, Duluth MN",calib,100
+us_mackinac_d,ytsearch:Mackinac Island live cam,45.84900,-84.61900,US,"Mackinac Island, MI",calib,150
+us_bar_harbor_d,ytsearch:Bar Harbor Maine live cam,44.38800,-68.20400,US,"Bar Harbor, ME",calib,150
+us_cape_may_d,ytsearch:Cape May beach live cam,38.93100,-74.92400,US,"Cape May, NJ",calib,150
+us_clearwater_d,ytsearch:Clearwater Beach live cam,27.97700,-82.82700,US,"Clearwater Beach, FL",calib,150
+us_lake_tahoe_d,ytsearch:Lake Tahoe live cam south shore,38.95500,-119.94500,US,"South Lake Tahoe, CA",calib,200
+us_new_orleans_d,ytsearch:New Orleans Bourbon Street live cam EarthCam,29.95870,-90.06550,US,"Bourbon Street, New Orleans LA",calib,100
+us_asheville_d,ytsearch:Asheville live cam downtown,35.59500,-82.55100,US,"Asheville, NC",calib,200
+us_sedona_d,ytsearch:Sedona live cam uptown,34.87000,-111.76100,US,"Sedona, AZ",calib,200
+us_st_augustine_d,ytsearch:St Augustine live cam bridge of lions,29.89300,-81.31000,US,"St Augustine, FL",calib,150
+us_galveston_d,ytsearch:Galveston seawall live cam,29.28300,-94.78800,US,"Galveston, TX",calib,150
+us_lake_placid_d,ytsearch:Lake Placid live cam Main Street,44.28000,-73.98200,US,"Lake Placid, NY",calib,150
