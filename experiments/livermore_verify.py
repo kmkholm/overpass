@@ -57,7 +57,7 @@ def main():
     man = pd.read_csv(a.manifest).set_index("clip_id")
     scales = {"narrow": np.arange(0.95, 1.0501, 0.01), "wide": np.arange(0.80, 1.2501, 0.01)}
     decoys = [(float(r * np.sin(np.radians(b))), float(r * np.cos(np.radians(b))), r, b) for r in RINGS_M for b in BEARINGS]
-    rows = []
+    rows = []; sites = []
     for case, m in man.iterrows():
         tr_path = Path(a.work) / f"{case}.traces.npz"
         if case not in fits.index or not np.isfinite(fits.loc[case].get("v_mps", np.nan)) or not tr_path.exists():
@@ -77,9 +77,10 @@ def main():
             obs = np.array([0.0, 0.0, site["h_m"]])
             z_true, n_true, who = site_score(win, segs, obs, t_target, a.tol, c, sc, a.max_range)
             zd = []
+            sites.append({"case": case, "scale": name, "r_m": 0.0, "bearing": -1, "z": z_true, "n_consistent": n_true})
             for dx, dy, r, b in decoys:
                 z, n, _ = site_score(win, segs, np.array([dx, dy, site["h_m"]]), t_target, a.tol, c, sc, a.max_range)
-                zd.append((z, n, r, b))
+                zd.append((z, n, r, b)); sites.append({"case": case, "scale": name, "r_m": r, "bearing": int(b), "z": z, "n_consistent": n})
             zs = np.array([z for z, _, _, _ in zd]); rank = int((zs > z_true).sum() + 1)
             k = int(np.argmax(zs))
             rec.update({f"{name}_z_true": round(z_true, 2), f"{name}_n_consistent_true": n_true, f"{name}_icao": who,
@@ -89,6 +90,7 @@ def main():
         rows.append(rec)
         print({k: rec[k] for k in ("case", "n_segments", "narrow_z_true", "narrow_n_consistent_true", "narrow_rank_true", "narrow_best_decoy_z", "wide_z_true", "wide_rank_true")}, flush=True)
     df = pd.DataFrame(rows); Path(a.out).parent.mkdir(parents=True, exist_ok=True); df.to_csv(a.out, index=False)
+    pd.DataFrame(sites).to_csv(Path(a.out).with_name(Path(a.out).stem + "_sites.csv"), index=False)
     ok = df[df.status == "ok"]
     print(f"\n{len(ok)} of {len(df)} recordings scored")
     for name in scales:
